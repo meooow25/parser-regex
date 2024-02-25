@@ -8,14 +8,11 @@ Regex based parsers
   capable of parsing [regular languages](https://en.wikipedia.org/wiki/Regular_language).
   There are no extra features that would make parsing non-regular languages
   possible.
-
 * Regexes are composed together using combinators. They are not represented by
   an inscrutable string of symbols.
-
 * Parse sequences of any type containing values of any type.
   Special support is provided for `Text` and `String` in the form of additional
   combinators and operations like find and replace.
-
 * Parsing runtime is linear in the length of the sequence being parsed. No
   exponential backtracking.
 
