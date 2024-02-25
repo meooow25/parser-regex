@@ -1,0 +1,25 @@
+74.txt.utf-8
+The Adventures of Tom Sawyer, Complete by Mark Twain
+Source URL:
+    https://www.gutenberg.org/ebooks/74.txt.utf-8
+License:
+    The Project Gutenberg License
+    https://www.gutenberg.org/policy/license.html
+    License text included in the file
+
+2014_in_video_games.html
+2014 in video games - Wikipedia
+Retrieved 2024-02-05
+Source URL:
+    https://en.wikipedia.org/wiki/2014_in_video_games
+License:
+    Creative Commons Attribution-ShareAlike License 4.0
+    https://en.wikipedia.org/wiki/Wikipedia:Text_of_the_Creative_Commons_Attribution-ShareAlike_4.0_International_License
+
+CaseFolding.txt
+A Unicode data file
+Source URL:
+    https://www.unicode.org/Public/15.1.0/ucd/CaseFolding.txt
+License:
+    Unicode License V3
+    https://www.unicode.org/license.txt
