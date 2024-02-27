@@ -1,5 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
 module Regex.Internal.Regex
   ( RE(..)
   , Strictness(..)
@@ -34,6 +36,8 @@ module Regex.Internal.Regex
   , chainr1
   , toFind
   , toFindMany
+  , toFindK
+  , toFindManyK
 
   , fmap'
   , liftA2'
@@ -46,6 +50,7 @@ import Control.DeepSeq (NFData(..), NFData1(..), rnf1)
 import Control.Monad
 import Data.Functor.Classes (Eq1(..), Ord1(..), Show1(..), showsUnaryWith)
 import qualified Data.Foldable as F
+import GHC.Exts (TYPE)
 
 ---------------------------------
 -- RE and constructor functions
@@ -84,67 +89,81 @@ import qualified Data.Foldable as F
 -- /Performance note/: Prefer the smaller of equivalent regexes, i.e. prefer
 -- @(a \<|> b) \<*> c@ over @(a \<*> c) \<|> (b \<*> c)@.
 --
-data RE c a where
-  RToken  :: !(c -> Maybe a) -> RE c a
-  RFmap   :: !Strictness -> !(a1 -> a) -> !(RE c a1) -> RE c a
-  RFmap_  :: a -> !(RE c a1) -> RE c a
-  RPure   :: a -> RE c a
-  RLiftA2 :: !Strictness -> !(a1 -> a2 -> a) -> !(RE c a1) -> !(RE c a2) -> RE c a
-  REmpty  :: RE c a
-  RAlt    :: !(RE c a) -> !(RE c a) -> (RE c a)
-  RFold   :: !Strictness -> !Greediness -> !(a -> a1 -> a) -> a -> !(RE c a1) -> RE c a
-  RMany   :: !(a1 -> a) -> !(a2 -> a) -> !(a2 -> a1 -> a2) -> !a2 -> !(RE c a1) -> RE c a -- Strict and greedy implicitly
+data RE (c :: TYPE crep) a where
+  RToken  :: forall {crep} (c :: TYPE crep) a.
+             !(c -> Maybe a) -> RE c a
+  RFmap   :: forall {crep} (c :: TYPE crep) a a1.
+             !Strictness -> !(a1 -> a) -> !(RE c a1) -> RE c a
+  RFmap_  :: forall {crep} (c :: TYPE crep) a a1.
+             a -> !(RE c a1) -> RE c a
+  RPure   :: forall {crep} (c :: TYPE crep) a.
+             a -> RE c a
+  RLiftA2 :: forall {crep} (c :: TYPE crep) a a1 a2.
+             !Strictness -> !(a1 -> a2 -> a) -> !(RE c a1) -> !(RE c a2) -> RE c a
+  REmpty  :: forall {crep} (c :: TYPE crep) a.
+             RE c a
+  RAlt    :: forall {crep} (c :: TYPE crep) a.
+             !(RE c a) -> !(RE c a) -> (RE c a)
+  RFold   :: forall {crep} (c :: TYPE crep) a a1.
+             !Strictness -> !Greediness -> !(a -> a1 -> a) -> a -> !(RE c a1) -> RE c a
+  RMany   :: forall {crep} (c :: TYPE crep) a a1 a2.
+             !(a1 -> a) -> !(a2 -> a) -> !(a2 -> a1 -> a2) -> !a2 -> !(RE c a1) -> RE c a -- Strict and greedy implicitly
 
 data Strictness = Strict | NonStrict
 data Greediness = Greedy | Minimal
 
-instance Functor (RE c) where
+instance Functor (RE (c :: TYPE crep)) where
   fmap = RFmap NonStrict
   (<$) = RFmap_
 
-fmap' :: (a -> b) -> RE c a -> RE c b
+fmap' :: forall {crep} (c :: TYPE crep) a b. (a -> b) -> RE c a -> RE c b
 fmap' = RFmap Strict
 
-instance Applicative (RE c) where
+instance Applicative (RE (c :: TYPE crep)) where
   pure = RPure
   liftA2 = RLiftA2 NonStrict
   re1 *> re2 = liftA2 (const id) (void re1) re2
   re1 <* re2 = liftA2 const re1 (void re2)
 
-liftA2' :: (a1 -> a2 -> b) -> RE c a1 -> RE c a2 -> RE c b
+liftA2' :: forall {crep} (c :: TYPE crep) a1 a2 b.
+           (a1 -> a2 -> b) -> RE c a1 -> RE c a2 -> RE c b
 liftA2' = RLiftA2 Strict
 
-instance Alternative (RE c) where
+instance Alternative (RE (c :: TYPE crep)) where
   empty = REmpty
   (<|>) = RAlt
   some re = liftA2' (:) re (many re)
   many = fmap reverse . foldlMany' (flip (:)) []
 
 -- | Parse a @c@ into an @a@ if the given function returns @Just@.
-token :: (c -> Maybe a) -> RE c a
+token :: forall {crep} (c :: TYPE crep) a. (c -> Maybe a) -> RE c a
 token = RToken
 
 -- | Zero or more. Biased towards matching more.
 --
 -- Also see the section "Looping parsers".
-manyr :: RE c a -> RE c (Many a)
+manyr :: forall {crep} (c :: TYPE crep) a. RE c a -> RE c (Many a)
 manyr = RMany Repeat (Finite . reverse) (flip (:)) []
 
 -- | Parse many occurences of the given @RE@. Biased towards matching more.
 --
 -- Also see the section "Looping parsers".
-foldlMany :: (b -> a -> b) -> b -> RE c a -> RE c b
+foldlMany ::
+  forall {crep} (c :: TYPE crep) a b. (b -> a -> b) -> b -> RE c a -> RE c b
 foldlMany = RFold NonStrict Greedy
 
-foldlMany' :: (b -> a -> b) -> b -> RE c a -> RE c b
+foldlMany' ::
+  forall {crep} (c :: TYPE crep) a b. (b -> a -> b) -> b -> RE c a -> RE c b
 foldlMany' f !z = RFold Strict Greedy f z
 
 -- | Parse many occurences of the given @RE@. Minimal, i.e. biased towards
 -- matching less.
-foldlManyMin :: (b -> a -> b) -> b -> RE c a -> RE c b
+foldlManyMin ::
+  forall {crep} (c :: TYPE crep) a b. (b -> a -> b) -> b -> RE c a -> RE c b
 foldlManyMin = RFold NonStrict Minimal
 
-foldlManyMin' :: (b -> a -> b) -> b -> RE c a -> RE c b
+foldlManyMin' ::
+  forall {crep} (c :: TYPE crep) a b. (b -> a -> b) -> b -> RE c a -> RE c b
 foldlManyMin' f !z = RFold Strict Minimal f z
 
 -- | Parse a @c@ if it satisfies the given predicate.
@@ -231,27 +250,27 @@ instance NFData1 Many where
 -- | Zero or one. Minimal, i.e. biased towards zero.
 --
 -- @Use Control.Applicative.'optional'@ for the same but biased towards one.
-optionalMin :: RE c a -> RE c (Maybe a)
+optionalMin :: forall {crep} (c :: TYPE crep) a. RE c a -> RE c (Maybe a)
 optionalMin re = pure Nothing <|> Just <$> re
 
 -- | One or more. Minimal, i.e. biased towards matching less.
-someMin :: RE c a -> RE c [a]
+someMin :: forall {crep} (c :: TYPE crep) a. RE c a -> RE c [a]
 someMin re = liftA2' (:) re (manyMin re)
 
 -- | Zero or more. Minimal, i.e. biased towards matching less.
-manyMin :: RE c a -> RE c [a]
+manyMin :: forall {crep} (c :: TYPE crep) a. RE c a -> RE c [a]
 manyMin = fmap reverse . foldlManyMin' (flip (:)) []
 
 -- | At least n times. Biased towards matching more.
-atLeast :: Int -> RE c a -> RE c [a]
+atLeast :: forall {crep} (c :: TYPE crep) a. Int -> RE c a -> RE c [a]
 atLeast n re = replicateAppendM (max n 0) re (many re)
 
 -- | At most n times. Biased towards matching more.
-atMost :: Int -> RE c a -> RE c [a]
+atMost :: forall {crep} (c :: TYPE crep) a. Int -> RE c a -> RE c [a]
 atMost n = betweenCount (0,n)
 
 -- | Between m and n times (inclusive). Biased towards matching more.
-betweenCount :: (Int, Int) -> RE c a -> RE c [a]
+betweenCount :: forall {crep} (c :: TYPE crep) a. (Int, Int) -> RE c a -> RE c [a]
 betweenCount (l,h) re
   | l' > h = empty
   | otherwise = replicateAppendM l' re (go (h - l'))
@@ -261,16 +280,17 @@ betweenCount (l,h) re
     go n = liftA2' (:) re (go (n-1)) <|> pure []
 
 -- | At least n times. Minimal, i.e. biased towards matching less.
-atLeastMin :: Int -> RE c a -> RE c [a]
+atLeastMin :: forall {crep} (c :: TYPE crep) a. Int -> RE c a -> RE c [a]
 atLeastMin n re = replicateAppendM (max n 0) re (manyMin re)
 
 -- | At most n times. Minimal, i.e. biased towards matching less.
-atMostMin :: Int -> RE c a -> RE c [a]
+atMostMin :: forall {crep} (c :: TYPE crep) a. Int -> RE c a -> RE c [a]
 atMostMin n = betweenCountMin (0,n)
 
 -- | Between m and n times (inclusive). Minimal, i.e. biased towards matching
 -- less.
-betweenCountMin :: (Int, Int) -> RE c a -> RE c [a]
+betweenCountMin ::
+  forall {crep} (c :: TYPE crep) a. (Int, Int) -> RE c a -> RE c [a]
 betweenCountMin (l,h) re
   | l' > h = empty
   | otherwise = replicateAppendM l' re (go (h - l'))
@@ -280,7 +300,8 @@ betweenCountMin (l,h) re
     go n = pure [] <|> liftA2' (:) re (go (n-1))
 
 -- n0 must be >= 0
-replicateAppendM :: Int -> RE c a -> RE c [a] -> RE c [a]
+replicateAppendM ::
+  forall {crep} (c :: TYPE crep) a. Int -> RE c a -> RE c [a] -> RE c [a]
 replicateAppendM n0 re re1 = go n0
   where
     go 0 = re1
@@ -288,38 +309,39 @@ replicateAppendM n0 re re1 = go n0
 
 -- | @r \`sepBy\` sep@ parses zero or more occurences of @r@, separated by
 -- @sep@. Biased towards matching more.
-sepBy :: RE c a -> RE c sep -> RE c [a]
+sepBy :: forall {crep} (c :: TYPE crep) a sep. RE c a -> RE c sep -> RE c [a]
 sepBy re sep = sepBy1 re sep <|> pure []
 
 -- | @r \`sepBy1\` sep@ parses one or more occurences of @r@, separated by
 -- @sep@. Biased towards matching more.
-sepBy1 :: RE c a -> RE c sep -> RE c [a]
+sepBy1 :: forall {crep} (c :: TYPE crep) a sep. RE c a -> RE c sep -> RE c [a]
 sepBy1 re sep = liftA2' (:) re (many (sep *> re))
 
 -- | @r \`endBy\` sep@ parses zero or more occurences of @r@, separated and
 -- ended by @sep@. Biased towards matching more.
-endBy :: RE c a -> RE c sep -> RE c [a]
+endBy :: forall {crep} (c :: TYPE crep) a sep. RE c a -> RE c sep -> RE c [a]
 endBy re sep = many (re <* sep)
 
 -- | @r \`endBy1\` sep@ parses one or more occurences of @r@, separated and
 -- ended by @sep@. Biased towards matching more.
-endBy1 :: RE c a -> RE c sep -> RE c [a]
+endBy1 :: forall {crep} (c :: TYPE crep) a sep. RE c a -> RE c sep -> RE c [a]
 endBy1 re sep = some (re <* sep)
 
 -- | @r \`sepEndBy\` sep@ parses zero or more occurences of @r@, separated and
 -- optionally ended by @sep@. Biased towards matching more.
-sepEndBy :: RE c a -> RE c sep -> RE c [a]
+sepEndBy :: forall {crep} (c :: TYPE crep) a sep. RE c a -> RE c sep -> RE c [a]
 sepEndBy re sep = sepEndBy1 re sep <|> pure []
 
 -- | @r \`sepEndBy1\` sep@ parses one or more occurences of @r@, separated and
 -- optionally ended by @sep@. Biased towards matching more.
-sepEndBy1 :: RE c a -> RE c sep -> RE c [a]
+sepEndBy1 :: forall {crep} (c :: TYPE crep) a sep. RE c a -> RE c sep -> RE c [a]
 sepEndBy1 re sep = sepBy1 re sep <* optional sep
 
 -- | @chainl1 r op@ parses one or more occurences of @r@, separated by @op@.
 -- The result is obtained by left associative application of all functions
 -- returned by @op@ to the values returned by @p@. Biased towards matching more.
-chainl1 :: RE c a -> RE c (a -> a -> a) -> RE c a
+chainl1 ::
+  forall {crep} (c :: TYPE crep) a. RE c a -> RE c (a -> a -> a) -> RE c a
 chainl1 re op = liftA2 (flip id) re rest
   where
     rest = foldlMany (flip (.)) id (liftA2 flip op re)
@@ -327,7 +349,8 @@ chainl1 re op = liftA2 (flip id) re rest
 -- | @chainr1 r op@ parses one or more occurences of @r@, separated by @op@.
 -- The result is obtained by right associative application of all functions
 -- returned by @op@ to the values returned by @p@. Biased towards matching more.
-chainr1 :: RE c a -> RE c (a -> a -> a) -> RE c a
+chainr1 ::
+  forall {crep} (c :: TYPE crep) a. RE c a -> RE c (a -> a -> a) -> RE c a
 chainr1 re op = liftA2 id rest re
   where
     rest = foldlMany (.) id (liftA2 (flip id) re op)
@@ -343,3 +366,24 @@ toFindMany :: RE c a -> RE c [a]
 toFindMany re =
   reverse <$>
   foldlMany' (flip ($)) [] ((:) <$> re <|> id <$ anySingle)
+
+-- | Results in the first occurence of the given @RE@. Fails if no occurence
+-- is found.
+--
+-- Like 'toFind' but allows for levity-polymorphic @c@.
+toFindK ::
+  forall {crep} (c :: TYPE crep) a. (forall r. r -> c -> r) -> RE c a -> RE c a
+toFindK const_ = \re ->
+  manyMin (token (const_ (Just ()))) *> re <* many (token (const_ (Just ())))
+{-# INLINE toFindK #-}
+
+-- | Results in the first occurence of the given @RE@. Fails if no occurence
+-- is found.
+--
+-- Like 'toFindMany' but allows for levity-polymorphic @c@.
+toFindManyK ::
+  forall {crep} (c :: TYPE crep) a. (forall r. r -> c -> r) -> RE c a -> RE c [a]
+toFindManyK const_ = \re ->
+  reverse <$>
+  foldlMany' (flip ($)) [] ((:) <$> re <|> token (const_ (Just id)))
+{-# INLINE toFindManyK #-}

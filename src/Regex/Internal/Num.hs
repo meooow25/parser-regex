@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Regex.Internal.Num
   ( mkNaturalDec
@@ -19,14 +20,15 @@ import Control.Monad
 import Data.Primitive.PrimArray
 import Data.Bits
 import Numeric.Natural
-
+import GHC.Exts (TYPE)
 import GHC.Num.Natural as Nat
 
 import Regex.Internal.Regex (RE)
 import qualified Regex.Internal.Regex as R
 
-mkNaturalDec
-  :: (Word -> Word -> RE c Word)  -- Decimal digit range
+mkNaturalDec ::
+  forall {crep} (c :: TYPE crep).
+  (Word -> Word -> RE c Word)  -- Decimal digit range
   -> RE c Natural
 mkNaturalDec d =
       0 <$ d 0 0
@@ -36,8 +38,9 @@ mkNaturalDec d =
     -- Start with len=1, it's reserved for the leading digit
 {-# INLINE mkNaturalDec #-}
 
-mkNaturalHex
-  :: (Word -> Word -> RE c Word)  -- Hexadecimal digit range
+mkNaturalHex ::
+  forall {crep} (c :: TYPE crep).
+  (Word -> Word -> RE c Word)  -- Hexadecimal digit range
   -> RE c Natural
 mkNaturalHex d =
       0 <$ d 0 0
@@ -47,17 +50,19 @@ mkNaturalHex d =
     -- Start with len=1, it's reserved for the leading digit
 {-# INLINE mkNaturalHex #-}
 
-mkSignedInteger :: RE c minus -> RE c plus -> RE c Natural -> RE c Integer
+mkSignedInteger ::
+  forall {crep} (c :: TYPE crep) minus plus.
+  RE c minus -> RE c plus -> RE c Natural -> RE c Integer
 mkSignedInteger minus plus rnat = signed <*> rnat
   where
     signed = negate . fromIntegral <$ minus
          <|> fromIntegral <$ plus
          <|> pure fromIntegral
 
-mkWordDecN
-  :: (Word -> Word -> RE c Word)  -- Decimal digit range
-  -> Int
-  -> RE c Word
+mkWordDecN ::
+  forall {crep} (c :: TYPE crep).
+  (Word -> Word -> RE c Word)  -- Decimal digit range
+  -> Int -> RE c Word
 mkWordDecN d n0
   | n0 <= 0 = empty
   | maxBoundWordDecLen <= n0 =
@@ -72,10 +77,10 @@ mkWordDecN d n0
     d09 = d 0 9
 {-# INLINE mkWordDecN #-}
 
-mkWordHexN
-  :: (Word -> Word -> RE c Word)  -- Hexadecimal digit range
-  -> Int
-  -> RE c Word
+mkWordHexN ::
+  forall {crep} (c :: TYPE crep).
+  (Word -> Word -> RE c Word)  -- Hexadecimal digit range
+  -> Int -> RE c Word
 mkWordHexN d n0
   | n0 <= 0 = empty
   | maxBoundWordHexLen < n0 =
@@ -88,8 +93,9 @@ mkWordHexN d n0
     d0f = d 0 15
 {-# INLINE mkWordHexN #-}
 
-mkWordRangeDec
-  :: (Word -> Word -> RE c Word)  -- Decimal digit range
+mkWordRangeDec ::
+  forall {crep} (c :: TYPE crep).
+  (Word -> Word -> RE c Word)  -- Decimal digit range
   -> (Word, Word)  -- Low high
   -> RE c Word
 mkWordRangeDec d (l,h) = mkWordRangeBase 10 quotRemPow10 pow10 len10 d l h
@@ -97,8 +103,9 @@ mkWordRangeDec d (l,h) = mkWordRangeBase 10 quotRemPow10 pow10 len10 d l h
     quotRemPow10 i x = x `quotRem` pow10 i
 {-# INLINE mkWordRangeDec #-}
 
-mkWordRangeHex
-  :: (Word -> Word -> RE c Word)  -- Hexadecimal digit range
+mkWordRangeHex ::
+  forall {crep} (c :: TYPE crep).
+  (Word -> Word -> RE c Word)  -- Hexadecimal digit range
   -> (Word, Word)  -- Low high
   -> RE c Word
 mkWordRangeHex d (l,h) = mkWordRangeBase 16 quotRemPow16 pow16 len16 d l h
@@ -106,8 +113,9 @@ mkWordRangeHex d (l,h) = mkWordRangeBase 16 quotRemPow16 pow16 len16 d l h
     quotRemPow16 i x = (x `unsafeShiftR` (4*i), x .&. (pow16 i - 1))
 {-# INLINE mkWordRangeHex #-}
 
-mkSignedIntRange
-  :: RE c minus
+mkSignedIntRange ::
+  forall {crep} (c :: TYPE crep) minus plus.
+  RE c minus
   -> RE c plus
   -> ((Word, Word) -> RE c Word)  -- Word range
   -> (Int, Int)  -- Low high
@@ -144,9 +152,9 @@ absw x = if x == minBound
 -- Make a tree based on the range. Keep the tree size small where possible.
 -- This is hard to explain in words, so see <link> for some pictures.
 
-mkWordRangeBase
-  :: forall c.
-     Word  -- Base
+mkWordRangeBase ::
+  forall {crep} (c :: TYPE crep).
+  Word  -- Base
   -> (Int -> Word -> (Word, Word)) -- quotRemPowBase
   -> (Int -> Word)  -- powBase
   -> (Word -> Int)  -- baseLen

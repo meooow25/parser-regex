@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Regex.Internal.Parser
@@ -14,6 +15,9 @@ module Regex.Internal.Parser
   , finishParser
   , Foldr
   , parseFoldr
+  , stepParserK
+  , FoldrK
+  , parseFoldrK
   ) where
 
 import Control.Applicative
@@ -21,6 +25,7 @@ import Control.Monad.Trans.State.Strict
 import Control.Monad.Fix
 import Data.Maybe (isJust)
 import qualified Data.Foldable as F
+import GHC.Exts (TYPE)
 
 import Regex.Internal.Regex (RE(..), Strictness(..), Greediness(..))
 import Regex.Internal.Unique (Unique(..), UniqueSet)
@@ -31,25 +36,40 @@ import qualified Regex.Internal.Unique as U
 ----------
 
 -- | A parser compiled from a @'RE' c a@.
-data Parser c a where
-  PToken  :: !(c -> Maybe a) -> Parser c a
-  PFmap   :: !Strictness -> !(a1 -> a) -> !(Parser c a1) -> Parser c a
-  PFmap_  :: !(Node c a) -> Parser c a
-  PPure   :: a -> Parser c a
-  PLiftA2 :: !Strictness -> !(a1 -> a2 -> a) -> !(Parser c a1) -> !(Parser c a2) -> Parser c a
-  PEmpty  :: Parser c a
-  PAlt    :: !Unique -> !(Parser c a) -> !(Parser c a) -> Parser c a
-  PFoldGr :: !Unique -> !Strictness -> !(a -> a1 -> a) -> a -> !(Parser c a1) -> Parser c a
-  PFoldMn :: !Unique -> !Strictness -> !(a -> a1 -> a) -> a -> !(Parser c a1) -> Parser c a
-  PMany   :: !Unique -> !(a1 -> a) -> !(a2 -> a) -> !(a2 -> a1 -> a2) -> !a2 -> !(Parser c a1) -> Parser c a
+data Parser (c :: TYPE crep) a where
+  PToken  :: forall {crep} (c :: TYPE crep) a.
+             !(c -> Maybe a) -> Parser c a
+  PFmap   :: forall {crep} (c :: TYPE crep) a a1.
+             !Strictness -> !(a1 -> a) -> !(Parser c a1) -> Parser c a
+  PFmap_  :: forall {crep} (c :: TYPE crep) a.
+             !(Node c a) -> Parser c a
+  PPure   :: forall {crep} (c :: TYPE crep) a.
+             a -> Parser c a
+  PLiftA2 :: forall {crep} (c :: TYPE crep) a a1 a2.
+             !Strictness -> !(a1 -> a2 -> a) -> !(Parser c a1) -> !(Parser c a2) -> Parser c a
+  PEmpty  :: forall {crep} (c :: TYPE crep) a.
+             Parser c a
+  PAlt    :: forall {crep} (c :: TYPE crep) a.
+             !Unique -> !(Parser c a) -> !(Parser c a) -> Parser c a
+  PFoldGr :: forall {crep} (c :: TYPE crep) a a1.
+             !Unique -> !Strictness -> !(a -> a1 -> a) -> a -> !(Parser c a1) -> Parser c a
+  PFoldMn :: forall {crep} (c :: TYPE crep) a a1.
+             !Unique -> !Strictness -> !(a -> a1 -> a) -> a -> !(Parser c a1) -> Parser c a
+  PMany   :: forall {crep} (c :: TYPE crep) a a1 a2.
+             !Unique -> !(a1 -> a) -> !(a2 -> a) -> !(a2 -> a1 -> a2) -> !a2 -> !(Parser c a1) -> Parser c a
 
 -- | A node in the NFA. Used for recognition.
-data Node c a where
-  NAccept :: a -> Node c a
-  NGuard  :: !Unique -> Node c a -> Node c a
-  NToken  :: !(c -> Maybe a1) -> !(Node c a) -> Node c a
-  NEmpty  :: Node c a
-  NAlt    :: !(Node c a) -> !(Node c a) -> Node c a
+data Node (c :: TYPE crep) a where
+  NAccept :: forall {crep} (c :: TYPE crep) a.
+             a -> Node c a
+  NGuard  :: forall {crep} (c :: TYPE crep) a.
+             !Unique -> Node c a -> Node c a
+  NToken  :: forall {crep} (c :: TYPE crep) a a1.
+             !(c -> Maybe a1) -> !(Node c a) -> Node c a
+  NEmpty  :: forall {crep} (c :: TYPE crep) a.
+             Node c a
+  NAlt    :: forall {crep} (c :: TYPE crep) a.
+             !(Node c a) -> !(Node c a) -> Node c a
 -- Note that NGuard is lazy in the node. We have to introduce laziness in
 -- at least one place, to make a graph with loops possible.
 
@@ -63,13 +83,14 @@ data Node c a where
 -- if you would like to limit the size.
 -- @RE@s with size greater than @(maxBound::Int) \`div\` 2@ are not supported
 -- and the behavior of such a @RE@ is undefined.
-compile :: RE c a -> Parser c a
+compile :: forall {crep} (c :: TYPE crep) a. RE c a -> Parser c a
 compile re = evalState (compileToParser re) (Unique 0)
 
 nxtU :: State Unique Unique
 nxtU = state $ \u -> let !u' = Unique (unUnique u + 1) in (u, u')
 
-compileToParser :: RE c a -> State Unique (Parser c a)
+compileToParser ::
+  forall {crep} (c :: TYPE crep) a. RE c a -> State Unique (Parser c a)
 compileToParser re = case re of
   RToken t -> pure $ PToken t
   RFmap st f re1 -> PFmap st f <$> compileToParser re1
@@ -92,7 +113,8 @@ compileToParser re = case re of
     _localU <- nxtU
     PMany u f1 f2 f z <$> compileToParser re1
 
-compileToNode :: forall c a a1. a -> RE c a1 -> State Unique (Node c a)
+compileToNode ::
+  forall {crep} (c :: TYPE crep) a a1. a -> RE c a1 -> State Unique (Node c a)
 compileToNode a re0 = go re0 (NAccept a)
   where
     go :: forall a2. RE c a2 -> Node c a -> State Unique (Node c a)
@@ -133,13 +155,14 @@ compileToNode a re0 = go re0 (NAccept a)
 -- be assumed to be in the same order as the length of a
 -- [regex pattern](https://en.wikipedia.org/wiki/Regular_expression#Syntax)
 -- corresponding to the @RE@.
-compileBounded :: Int -> RE c a -> Maybe (Parser c a)
+compileBounded ::
+  forall {crep} (c :: TYPE crep) a. Int -> RE c a -> Maybe (Parser c a)
 compileBounded lim re =
   if checkSize lim re
   then Just $! compile re
   else Nothing
 
-checkSize :: Int -> RE c a -> Bool
+checkSize :: forall {crep} (c :: TYPE crep) a. Int -> RE c a -> Bool
 checkSize lim re0 = isJust (evalStateT (go re0) 0)
   where
     go :: RE c a1 -> StateT Int Maybe ()
@@ -163,27 +186,38 @@ checkSize lim re0 = isJust (evalStateT (go re0) 0)
 -- Parse
 ----------
 
-data Cont c b a where
-  CTop     :: Cont c a a
-  CFmap    :: !Strictness -> !(b -> a1) -> !(Cont c a1 a) -> Cont c b a
-  CFmap_   :: !(Node c a1) -> !(Cont c a1 a) -> Cont c b a
-  CLiftA2A :: !Strictness -> !(b -> a2 -> a3) -> !(Parser c a2) -> !(Cont c a3 a) -> Cont c b a
-  CLiftA2B :: !Strictness -> !(a1 -> b -> a3) -> a1 -> !(Cont c a3 a) -> Cont c b a
-  CAlt     :: !Unique -> !(Cont c b a) -> Cont c b a
-  CFoldGr  :: !Unique -> !Strictness -> !(Parser c b) -> !(a1 -> b -> a1) -> a1 -> !(Cont c a1 a) -> Cont c b a
-  CFoldMn  :: !Unique -> !Strictness -> !(Parser c b) -> !(a1 -> b -> a1) -> a1 -> !(Cont c a1 a) -> Cont c b a
-  CMany    :: !Unique -> !(Parser c b) -> !(b -> a2) -> !(a1 -> a2) -> !(a1 -> b -> a1) -> !a1 -> !(Cont c a2 a) -> Cont c b a
+data Cont (c :: TYPE crep) b a where
+  CTop     :: forall {crep} (c :: TYPE crep) a.
+              Cont c a a
+  CFmap    :: forall {crep} (c :: TYPE crep) b a a1.
+              !Strictness -> !(b -> a1) -> !(Cont c a1 a) -> Cont c b a
+  CFmap_   :: forall {crep} (c :: TYPE crep) b a a1.
+              !(Node c a1) -> !(Cont c a1 a) -> Cont c b a
+  CLiftA2A :: forall {crep} (c :: TYPE crep) b a a2 a3.
+              !Strictness -> !(b -> a2 -> a3) -> !(Parser c a2) -> !(Cont c a3 a) -> Cont c b a
+  CLiftA2B :: forall {crep} (c :: TYPE crep) b a a1 a3.
+              !Strictness -> !(a1 -> b -> a3) -> a1 -> !(Cont c a3 a) -> Cont c b a
+  CAlt     :: forall {crep} (c :: TYPE crep) b a.
+              !Unique -> !(Cont c b a) -> Cont c b a
+  CFoldGr  :: forall {crep} (c :: TYPE crep) b a a1.
+              !Unique -> !Strictness -> !(Parser c b) -> !(a1 -> b -> a1) -> a1 -> !(Cont c a1 a) -> Cont c b a
+  CFoldMn  :: forall {crep} (c :: TYPE crep) b a a1.
+              !Unique -> !Strictness -> !(Parser c b) -> !(a1 -> b -> a1) -> a1 -> !(Cont c a1 a) -> Cont c b a
+  CMany    :: forall {crep} (c :: TYPE crep) b a a1 a2.
+              !Unique -> !(Parser c b) -> !(b -> a2) -> !(a1 -> a2) -> !(a1 -> b -> a1) -> !a1 -> !(Cont c a2 a) -> Cont c b a
 
-data NeedC c a where
-  NeedC :: (c -> Maybe b) -> !(Cont c b a) -> NeedC c a
+data NeedC (c :: TYPE crep) a where
+  NeedC :: forall {crep} (c :: TYPE crep) a b.
+           (c -> Maybe b) -> !(Cont c b a) -> NeedC c a
 
-data StepState c a = StepState
-  { sSet :: {-# UNPACK #-} !UniqueSet
-  , sNeed :: ![NeedC c a]
-  , sResult :: !(Maybe a)
-  }
+data StepState (c :: TYPE crep) a where
+  StepState :: forall {crep} (c :: TYPE crep) a.
+    { sSet :: {-# UNPACK #-} !UniqueSet
+    , sNeed :: ![NeedC c a]
+    , sResult :: !(Maybe a)
+    } -> StepState c a
 
-stepStateZero :: StepState c a
+stepStateZero :: forall {crep} (c :: TYPE crep) a. StepState c a
 stepStateZero = StepState U.empty [] Nothing
 
 -- Note: Ideally we would have
@@ -194,13 +228,15 @@ stepStateZero = StepState U.empty [] Nothing
 -- Using State is pretty convenient though, so it is used in branches. This
 -- seems to get optimized well enough.
 
-sMember :: Unique -> State (StepState c a) Bool
+sMember :: forall {crep} (c :: TYPE crep) a. Unique -> State (StepState c a) Bool
 sMember u = gets $ \pt -> U.member u (sSet pt)
 
-sInsert :: Unique -> State (StepState c a) ()
+sInsert :: forall {crep} (c :: TYPE crep) a. Unique -> State (StepState c a) ()
 sInsert u = modify' $ \pt -> pt { sSet = U.insert u (sSet pt) }
 
-down :: Parser c b -> Cont c b a -> StepState c a -> StepState c a
+down ::
+  forall {crep} (c :: TYPE crep) a b.
+  Parser c b -> Cont c b a -> StepState c a -> StepState c a
 down p !ct !pt = case p of
   PToken t -> pt { sNeed = NeedC t ct : sNeed pt }
   PFmap st f p1 -> down p1 (CFmap st f ct) pt
@@ -233,7 +269,9 @@ down p !ct !pt = case p of
         let !x = f2 z
         modify' $ up x ct
 
-downNode :: Node c b -> Cont c b a -> StepState c a -> StepState c a
+downNode ::
+  forall {crep} (c :: TYPE crep) a b.
+  Node c b -> Cont c b a -> StepState c a -> StepState c a
 downNode n0 !ct = go n0
   where
     go n !pt = case n of
@@ -246,7 +284,9 @@ downNode n0 !ct = go n0
       NEmpty -> pt
       NAlt n1 n2 -> go n2 $! go n1 pt
 
-up :: b -> Cont c b a -> StepState c a -> StepState c a
+up ::
+  forall {crep} (c :: TYPE crep) a b.
+  b -> Cont c b a -> StepState c a -> StepState c a
 up b ct !pt = case ct of
   CTop -> pt { sResult = sResult pt <|> Just b }
   CFmap st f ct1 -> case st of
@@ -310,13 +350,14 @@ localU = Unique . (+1) . unUnique
 --------------------
 
 -- | The state maintained by a parser.
-data ParserState c a = ParserState
-  { psNeed :: ![NeedC c a]
-  , psResult :: !(Maybe a)
-  }
+data ParserState (c :: TYPE crep) a where
+  ParserState :: forall {crep} (c :: TYPE crep) a.
+    { psNeed :: ![NeedC c a]
+    , psResult :: !(Maybe a)
+    } -> ParserState c a
 
 -- | \(O(m \log m)\). Prepare a parser for input.
-prepareParser :: Parser c a -> ParserState c a
+prepareParser :: forall {crep} (c :: TYPE crep) a. Parser c a -> ParserState c a
 prepareParser p = toParserState (down p CTop stepStateZero)
 
 -- | \(O(m \log m)\). Step a parser by feeding a single element @c@. Returns
@@ -332,10 +373,10 @@ stepParser ps c =
 {-# INLINE stepParser #-}
 
 -- | \(O(1)\). Get the parse result for the input fed into the parser so far.
-finishParser :: ParserState c a -> Maybe a
+finishParser :: forall {crep} (c :: TYPE crep) a. ParserState c a -> Maybe a
 finishParser = psResult
 
-toParserState :: StepState c a -> ParserState c a
+toParserState :: forall {crep} (c :: TYPE crep) a. StepState c a -> ParserState c a
 toParserState pt = ParserState
   { psNeed = reverse (sNeed pt)
   , psResult = sResult pt
@@ -350,6 +391,36 @@ parseFoldr fr = \p xs -> fr f finishParser xs (prepareParser p)
   where
     f c k = \ps -> stepParser ps c >>= k
 {-# INLINE parseFoldr #-}
+
+-- | \(O(m \log m)\). Step a parser by feeding a single element @c@. Returns
+-- @Nothing@ if the parse has failed regardless of further input. Otherwise,
+-- returns an updated @ParserState@.
+--
+-- Like 'stepParser' but allows for levity-polymorphic @c@.
+stepParserK ::
+  forall {crep} (c :: TYPE crep) a.
+  ParserState c a -> (forall r. (c -> r) -> r) -> Maybe (ParserState c a)
+stepParserK ps c =
+  if null (psNeed ps)
+  then Nothing
+  else
+    let f pt (NeedC t ct) = maybe pt (\b -> up b ct pt) (c t)
+    in Just $ toParserState $ F.foldl' f stepStateZero (psNeed ps)
+{-# INLINE stepParserK #-}
+
+-- | A fold function.
+type FoldrK f (a :: TYPE arep) =
+  forall b. ((forall r. (a -> r) -> r) -> b -> b) -> b -> f -> b
+
+-- | \(O(mn \log m)\). Run a parser given a sequence @f@ and a fold of @f@.
+--
+-- Like 'parseFoldr' but allows for levity-polymorphic @c@.
+parseFoldrK ::
+  forall {crep} (c :: TYPE crep) f a. FoldrK f c -> Parser c a -> f -> Maybe a
+parseFoldrK fr = \p xs -> fr f finishParser xs (prepareParser p)
+  where
+    f (c :: forall r. (c -> r) -> r) k = \ps -> stepParserK ps c >>= k
+{-# INLINE parseFoldrK #-}
 
 ---------
 -- Util

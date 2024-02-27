@@ -19,6 +19,9 @@ module Regex.Base
   , P.finishParser
   , P.Foldr
   , P.parseFoldr
+  , P.stepParserK
+  , P.FoldrK
+  , P.parseFoldrK
 
     -- * @RE@s and combinators
   , R.token
@@ -49,6 +52,8 @@ module Regex.Base
   , R.chainr1
   , R.toFind
   , R.toFindMany
+  , R.toFindK
+  , R.toFindManyK
 
     -- * Strict combinators
     -- $strict
