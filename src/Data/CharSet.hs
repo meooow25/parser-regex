@@ -1,11 +1,26 @@
+-- |
+-- It is recommended to import this module qualified to avoid name conflicts
+-- with functions from the Prelude.
+--
+-- Enabling [@OverloadedStrings@](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/overloaded_strings.html)
+-- will allow declaring @CharSet@s using string literal syntax.
+--
+-- @
+-- {-# LANGUAGE OverloadedStrings #-}
+--
+-- import qualified Data.CharSet as CS
+-- 
+-- vowels :: CS.CharSet
+-- vowels = "aeiou"
+-- @
+--
 module Data.CharSet
   (
     -- * The @CharSet@ type
     CS.CharSet
 
     -- * @CharSet@ operations
-    --
-    -- $doc
+    -- $ops
   , CS.singleton
   , CS.fromRange
   , CS.fromList
@@ -41,7 +56,7 @@ module Data.CharSet
 import qualified Regex.Internal.CharSet as CS
 import qualified Regex.Internal.CharSets as CSets
 
--- $doc
+-- $ops
 --
 -- Variables used:
 --
