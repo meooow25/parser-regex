@@ -8,15 +8,14 @@ Regex based parsers
   capable of parsing [regular languages](https://en.wikipedia.org/wiki/Regular_language).
   There are no extra features that would make parsing non-regular languages
   possible.
-* Regexes are composed together using combinators. They are not represented by
-  an inscrutable string of symbols.
-* Parse sequences of any type containing values of any type.
-  Special support is provided for `Text` and `String` in the form of additional
-  combinators and operations like find and replace.
+* Regexes are composed using combinators.
+* Resumable parsing of sequences of any type containing values of any type.
+* Special support for `Text` and `String` in the form of convenient combinators
+  and operations like find and replace.
 * Parsing runtime is linear in the length of the sequence being parsed. No
   exponential backtracking.
 
-## Example
+## Usage
 
 ```hs
 {-# LANGUAGE OverloadedStrings #-}
@@ -37,7 +36,7 @@ data URI = URI
 
 -- ^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?
 -- A non-validating regex to extract parts of a URI, from RFC 3986
--- The equivalent of this regex:
+-- Translated:
 uriRE :: R.REText URI
 uriRE = URI
   <$> optional (R.someTextOf (CS.not ":/?#") <* R.char ':')
@@ -56,31 +55,36 @@ uriRE = URI
 
 ## Alternatives
 
+### `regex-applicative`
+
 [`regex-applicative`](https://hackage.haskell.org/package/regex-applicative) is
-the primary inspiration for this package, and provides a similar set of
+the primary inspiration for this library, and provides a similar set of
 features.
 `parser-regex` attempts to be a more fully-featured library built on the
 ideas of `regex-applicative`.
 
-Other alternatives are more traditional regex libraries, like
-[`regex-tdfa`](https://hackage.haskell.org/package/regex-tdfa) and
+### Traditional regex libraries
+
+Other alternatives are more traditional regex libraries that use regex patterns,
+like [`regex-tdfa`](https://hackage.haskell.org/package/regex-tdfa) and
 [`regex-pcre`](https://hackage.haskell.org/package/regex-pcre)/
 [`regex-pcre-builtin`](https://hackage.haskell.org/package/regex-pcre-builtin).
 
-It is also common to reach for monadic parser combinator libraries, but
-comparing them with regexes is comparing apples and oranges. However, it may be
-what you need, so please see
-[`parsec`](https://hackage.haskell.org/package/parsec),
-[`megaparsec`](https://hackage.haskell.org/package/megaparsec), or
-[`attoparsec`](https://hackage.haskell.org/package/attoparsec).
+Reasons to use `parser-regex` over traditional regex libraries:
 
-### Performance
+* You prefer parser combinators over regex patterns
+* You need more powerful parsing capabilities than just submatch extraction
+* You need to parse a sequence type that is not supported by these regex
+  libraries
 
-`parser-regex` is not going to be the fastest regex library on Hackage. Because
-of the polymorphic design of the library, it cannot compete with specialized
-regex libraries with a smaller feature set. Of course, effort has been made
-to be as fast as possible. Any ideas for improving performance further are very
-welcome.
+Reasons to use traditional regex libraries over `parser-regex`:
+
+* The terseness of regex patterns is better suited for your use case
+* You need something very fast, and adversarial input is not a concern.
+  Use `regex-pcre`/`regex-pcre-builtin`.
+
+For a more detailed comparison of regex libraries, see
+[here](https://github.com/meooow25/parser-regex/tree/master/bench).
 
 ## Contributing
 
