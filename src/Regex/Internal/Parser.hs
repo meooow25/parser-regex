@@ -327,7 +327,7 @@ localU = Unique . (+1) . unUnique
 -- Running a Parser
 --------------------
 
--- | The state maintained by a parser.
+-- | The state maintained for parsing.
 data ParserState c a = ParserState
   { psNeed :: !(NeedCList c a)
   , psResult :: !(Maybe a)

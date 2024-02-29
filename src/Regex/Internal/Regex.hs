@@ -10,7 +10,6 @@ module Regex.Internal.Regex
   , anySingle
   , single
   , satisfy
-  , foldable
 
   , foldlMany
   , foldlManyMin
@@ -159,10 +158,6 @@ single !c = satisfy (c==)
 -- | Parse any @c@.
 anySingle :: RE c c
 anySingle = token Just
-
--- | Parse the given chunk of @c@s.
-foldable :: (Foldable f, Eq c) => f c -> RE c (f c)
-foldable xs = xs <$ foldr ((*>) . single) (pure ()) xs
 
 ---------
 -- Many

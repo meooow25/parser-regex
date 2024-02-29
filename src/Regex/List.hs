@@ -109,10 +109,11 @@ import qualified Regex.Internal.List as L
 -- == Recursive definitions
 --
 -- It is not possible to define a @RE@ recursively. If it were permitted, it
--- would be capable of parsing more than [regular languages](https://en.wikipedia.org/wiki/Regular_language).
--- Unfortunately, there is no way to make it impossible to write such a regex
--- in the first place. So it must be avoided by the programmer. As an example,
--- avoid this:
+-- would be capable of parsing more than
+-- [regular languages](https://en.wikipedia.org/wiki/Regular_language).
+-- Unfortunately, there is no good way\* to make it impossible to write such
+-- a regex in the first place. So it must be avoided by the programmer. As an
+-- example, avoid this:
 --
 -- @
 -- re :: RE Char [String]
@@ -132,6 +133,9 @@ import qualified Regex.Internal.List as L
 -- If you find that your regex is impossible to write without recursion,
 -- you are attempting to parse a non-regular language! You need a more powerful
 -- parser than what this library has to offer.
+--
+-- \* [Unlifted datatypes](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/primitives.html#unlifted-datatypes)
+-- can serve this purpose but they are too inconvenient to work with.
 --
 -- == Laziness
 --
@@ -201,6 +205,6 @@ import qualified Regex.Internal.List as L
 --   \(O(m)\) memory is required.
 --
 -- This applies even as subcomponents. So, any subcomponent @RE@ of a larger
--- @RE@ that is only recognizing a section of the list is cheap in terms of
+-- @RE@ that is only recognizing a section of the list is cheaper in terms of
 -- memory.
 --
