@@ -191,17 +191,18 @@ data Cont c b a where
   CFoldMn  :: !Unique -> !Strictness -> !(Parser c b) -> !(a1 -> b -> a1) -> a1 -> !(Cont c a1 a) -> Cont c b a
   CMany    :: !Unique -> !(Parser c b) -> !(b -> a2) -> !(a1 -> a2) -> !(a1 -> b -> a1) -> !a1 -> !(Cont c a2 a) -> Cont c b a
 
-data NeedC c a where
-  NeedC :: (c -> Maybe b) -> !(Cont c b a) -> NeedC c a
+data NeedCList c a where
+  NeedCCons :: !(c -> Maybe b) -> !(Cont c b a) -> !(NeedCList c a) -> NeedCList c a
+  NeedCNil :: NeedCList c a
 
 data StepState c a = StepState
   { sSet :: {-# UNPACK #-} !UniqueSet
-  , sNeed :: ![NeedC c a]
+  , sNeed :: !(NeedCList c a)
   , sResult :: !(Maybe a)
   }
 
 stepStateZero :: StepState c a
-stepStateZero = StepState U.empty [] Nothing
+stepStateZero = StepState U.empty NeedCNil Nothing
 
 -- Note: Ideally we would have
 -- down :: Parser c b -> Cont c b a -> State (StepState c a) ()
@@ -219,7 +220,7 @@ sInsert u = modify' $ \pt -> pt { sSet = U.insert u (sSet pt) }
 
 down :: Parser c b -> Cont c b a -> StepState c a -> StepState c a
 down p !ct !pt = case p of
-  PToken t -> pt { sNeed = NeedC t ct : sNeed pt }
+  PToken t -> pt { sNeed = NeedCCons t ct (sNeed pt) }
   PFmap st f p1 -> down p1 (CFmap st f ct) pt
   PFmap_ n -> downNode n ct pt
   PPure b -> up b ct pt
@@ -259,7 +260,7 @@ downNode n0 !ct = go n0
         | U.member u (sSet pt) -> pt
         | otherwise -> go n1 (pt { sSet = U.insert u (sSet pt) })
       NToken t nxt ->
-        pt { sNeed = NeedC t (CFmap_ nxt ct) : sNeed pt }
+        pt { sNeed = NeedCCons t (CFmap_ nxt ct) (sNeed pt) }
       NEmpty -> pt
       NAlt n1 n2 ns -> F.foldl' (flip go) (go n2 (go n1 pt)) ns
 
@@ -328,7 +329,7 @@ localU = Unique . (+1) . unUnique
 
 -- | The state maintained by a parser.
 data ParserState c a = ParserState
-  { psNeed :: ![NeedC c a]
+  { psNeed :: !(NeedCList c a)
   , psResult :: !(Maybe a)
   }
 
@@ -340,12 +341,14 @@ prepareParser p = toParserState (down p CTop stepStateZero)
 -- @Nothing@ if the parse has failed regardless of further input. Otherwise,
 -- returns an updated @ParserState@.
 stepParser :: ParserState c a -> c -> Maybe (ParserState c a)
-stepParser ps c =
-  if null (psNeed ps)
-  then Nothing
-  else
-    let f pt (NeedC t ct) = maybe pt (\b -> up b ct pt) (t c)
-    in Just $ toParserState $ F.foldl' f stepStateZero (psNeed ps)
+stepParser ps c = case psNeed ps of
+  NeedCNil -> Nothing
+  needs -> Just $! toParserState (go needs)
+  where
+    go (NeedCCons t ct rest) =
+      let !pt = go rest
+      in maybe pt (\b -> up b ct pt) (t c)
+    go NeedCNil = stepStateZero
 {-# INLINE stepParser #-}
 
 -- | \(O(1)\). Get the parse result for the input fed into the parser so far.
@@ -354,7 +357,7 @@ finishParser = psResult
 
 toParserState :: StepState c a -> ParserState c a
 toParserState pt = ParserState
-  { psNeed = reverse (sNeed pt)
+  { psNeed = sNeed pt
   , psResult = sResult pt
   }
 
