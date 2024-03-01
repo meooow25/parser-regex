@@ -6,10 +6,12 @@ module Regex.Internal.Debug
   , dispCharRanges
   ) where
 
+import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Identity
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Writer.CPS
+import qualified Data.Foldable as F
 import Data.Maybe (isJust)
 import Data.Semigroup
 import Data.IntMap.Strict (IntMap)
@@ -92,10 +94,11 @@ parserToDot ma p0 = execM $ do
           go re1 >>= writeEdge i
           go re2 >>= writeEdge i
       PEmpty -> new $ showString "PEmpty"
-      PAlt _ re1 re2 ->
+      PAlt _ re1 re2 res ->
         withNew (showString "PAlt") $ \i -> do
           go re1 >>= writeEdge i
           go re2 >>= writeEdge i
+          F.traverse_ (go >=> writeEdge i) res
       PMany _ _ _ _ _ re1 ->
         withNew (showString "PMany") $ \i ->
           go re1 >>= writeEdge i
@@ -120,9 +123,10 @@ parserToDot ma p0 = execM $ do
         withNewT (labelToken "NToken" t ma) $ \i ->
           goNode n1 >>= lift . writeEdge i
       NEmpty -> lift $ new $ showString "NEmpty"
-      NAlt n1 n2 -> withNewT (showString "NAlt") $ \i -> do
+      NAlt n1 n2 ns -> withNewT (showString "NAlt") $ \i -> do
         goNode n1 >>= lift . writeEdge i
         goNode n2 >>= lift . writeEdge i
+        F.traverse_ (goNode >=> lift . writeEdge i) ns
 
 ------------------
 -- Display Chars

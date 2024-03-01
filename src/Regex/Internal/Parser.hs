@@ -20,6 +20,7 @@ import Control.Applicative
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Fix
 import Data.Maybe (isJust)
+import Data.Primitive.SmallArray
 import qualified Data.Foldable as F
 
 import Regex.Internal.Regex (RE(..), Strictness(..), Greediness(..))
@@ -38,7 +39,7 @@ data Parser c a where
   PPure   :: a -> Parser c a
   PLiftA2 :: !Strictness -> !(a1 -> a2 -> a) -> !(Parser c a1) -> !(Parser c a2) -> Parser c a
   PEmpty  :: Parser c a
-  PAlt    :: !Unique -> !(Parser c a) -> !(Parser c a) -> Parser c a
+  PAlt    :: !Unique -> !(Parser c a) -> !(Parser c a) -> !(SmallArray (Parser c a)) -> Parser c a
   PFoldGr :: !Unique -> !Strictness -> !(a -> a1 -> a) -> a -> !(Parser c a1) -> Parser c a
   PFoldMn :: !Unique -> !Strictness -> !(a -> a1 -> a) -> a -> !(Parser c a1) -> Parser c a
   PMany   :: !Unique -> !(a1 -> a) -> !(a2 -> a) -> !(a2 -> a1 -> a2) -> !a2 -> !(Parser c a1) -> Parser c a
@@ -49,7 +50,7 @@ data Node c a where
   NGuard  :: !Unique -> Node c a -> Node c a
   NToken  :: !(c -> Maybe a1) -> !(Node c a) -> Node c a
   NEmpty  :: Node c a
-  NAlt    :: !(Node c a) -> !(Node c a) -> Node c a
+  NAlt    :: !(Node c a) -> !(Node c a) -> !(SmallArray (Node c a)) -> Node c a
 -- Note that NGuard is lazy in the node. We have to introduce laziness in
 -- at least one place, to make a graph with loops possible.
 
@@ -78,9 +79,13 @@ compileToParser re = case re of
   RLiftA2 st f re1 re2 ->
     liftA2 (PLiftA2 st f) (compileToParser re1) (compileToParser re2)
   REmpty -> pure PEmpty
-  RAlt re1 re2 -> do
+  RAlt re01 re02 -> do
     u <- nxtU
-    liftA2 (PAlt u) (compileToParser re1) (compileToParser re2)
+    let (re1,re2,res) = gatherAlts re01 re02
+    p1 <- compileToParser re1
+    p2 <- compileToParser re2
+    ps <- traverse compileToParser res
+    pure $ PAlt u p1 p2 (smallArrayFromList ps)
   RFold st gr f z re1 -> do
     u <- nxtU
     _localU <- nxtU
@@ -103,10 +108,14 @@ compileToNode a re0 = go re0 (NAccept a)
       RPure _ -> pure nxt
       RLiftA2 _ _ re1 re2 -> go re2 nxt >>= go re1
       REmpty -> pure NEmpty
-      RAlt re1 re2 -> do
+      RAlt re01 re02 -> do
         u <- nxtU
         let nxt1 = NGuard u nxt
-        liftA2 NAlt (go re1 nxt1) (go re2 nxt1)
+            (re1,re2,res) = gatherAlts re01 re02
+        n1 <- go re1 nxt1
+        n2 <- go re2 nxt1
+        ns <- traverse (flip go nxt1) res
+        pure $ NAlt n1 n2 (smallArrayFromList ns)
       RFold _ gr _ _ re1 -> goMany gr re1 nxt
       RMany _ _ _ _ re1 -> goMany Greedy re1 nxt
     goMany :: forall a2.
@@ -116,8 +125,16 @@ compileToNode a re0 = go re0 (NAccept a)
       mfix $ \n -> do
         ndown <- go re1 n
         case gr of
-           Greedy -> pure $ NGuard u (NAlt ndown nxt)
-           Minimal -> pure $ NGuard u (NAlt nxt ndown)
+           Greedy -> pure $ NGuard u (NAlt ndown nxt emptySmallArray)
+           Minimal -> pure $ NGuard u (NAlt nxt ndown emptySmallArray)
+
+gatherAlts :: RE c a -> RE c a -> (RE c a, RE c a, [RE c a])
+gatherAlts re01 re02 = case go re01 (go re02 []) of
+  re11:re12:res -> (re11, re12, res)
+  _ -> errorWithoutStackTrace "Regex.Internal.Parser.gatherAlts: impossible"
+  where
+    go (RAlt re1 re2) = go re1 . go re2
+    go re = (re:)
 
 --------------------
 -- Compile bounded
@@ -208,9 +225,9 @@ down p !ct !pt = case p of
   PPure b -> up b ct pt
   PLiftA2 st f p1 p2 -> down p1 (CLiftA2A st f p2 ct) pt
   PEmpty -> pt
-  PAlt u p1 p2 ->
+  PAlt u p1 p2 ps ->
     let ct1 = CAlt u ct
-    in down p2 ct1 $! down p1 ct1 pt
+    in F.foldl' (\pt' p' -> down p' ct1 pt') (down p2 ct1 (down p1 ct1 pt)) ps
   PFoldGr u st f z p1 -> flip execState pt $
     unlessM (sMember u) $ do
       sInsert (localU u)
@@ -244,7 +261,7 @@ downNode n0 !ct = go n0
       NToken t nxt ->
         pt { sNeed = NeedC t (CFmap_ nxt ct) : sNeed pt }
       NEmpty -> pt
-      NAlt n1 n2 -> go n2 $! go n1 pt
+      NAlt n1 n2 ns -> F.foldl' (flip go) (go n2 (go n1 pt)) ns
 
 up :: b -> Cont c b a -> StepState c a -> StepState c a
 up b ct !pt = case ct of
@@ -417,3 +434,17 @@ unlessM mb mx = do
 --   a value up before going down. So, the localU is set when going up and if
 --   we find it when going down, we are looping. When we send down a value, we
 --   guard entry into the node using its (not localU) Unique.
+
+-- Note [Regex optimizations]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Currently, the only optimization performed is
+--
+-- * Gather multiple RAlts into a single multi-way branching PAlt/NAlt. It's
+--   better to multi-way branch at a flat array instead of nested 2-way
+--   branches, much less pointer-chasing.
+--
+-- Other possible optimizations are possible when compiling, such as removing
+-- paths going to REmpty. Or even at the RE level by applying laws, such as
+-- liftA2 f REmpty x = REmpty or liftA2 f (RPure x) y = RFmap (f x) y.
+-- I don't know yet if this is worth doing.
