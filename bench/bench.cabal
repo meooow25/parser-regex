@@ -5,18 +5,25 @@ version:            0.1.0.0
 common warnings
     ghc-options: -Wall
 
-benchmark compare
+benchmark bench
     import: warnings
+
+    main-is: Main.hs
+
+    other-modules:
+        Bench
+        Compare
 
     build-depends:
         base
       , array
+      , bytestring
       , deepseq
+      , MonadRandom
       , tasty
       , tasty-bench
       , tasty-hunit
       , text
-      , bytestring
 
       , parser-regex
       , regex == 1.1.0.2
@@ -27,6 +34,5 @@ benchmark compare
       , regex-with-pcre == 1.1.0.2
 
     hs-source-dirs: .
-    main-is: Compare.hs
     default-language: Haskell2010
     type: exitcode-stdio-1.0
