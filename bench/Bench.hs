@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
+module Bench (benches) where
 
 import Control.Applicative
 import Control.Monad
@@ -14,8 +15,8 @@ import Test.Tasty.Bench
 import qualified Regex.Text as RT
 import qualified Regex.Base as RB
 
-main :: IO ()
-main = defaultMain
+benches :: Benchmark
+benches = bgroup "parser-regex"
   [ textBenches
   ]
 

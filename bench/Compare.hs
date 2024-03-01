@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+module Compare (benches) where
 
 import Control.Applicative
 import Control.DeepSeq
@@ -18,7 +19,7 @@ import qualified Data.Text.Encoding as TEnc
 import GHC.Generics (Generic)
 
 import Test.Tasty (testGroup)
-import Test.Tasty.Bench (bgroup, bench, env, whnf, nf, defaultMain)
+import Test.Tasty.Bench
 import Test.Tasty.HUnit (testCase, (@?=))
 
 -- parser-regex
@@ -44,8 +45,8 @@ import qualified Text.RE.TDFA.Text as TDFAReplace
 -- regex-with-pcre
 import qualified Text.RE.PCRE.ByteString as PCREReplace
 
-main :: IO ()
-main = defaultMain
+benches :: Benchmark
+benches = bgroup "compare"
   [ env englishText $ \ ~(t,b,s) ->
     bgroup "English text 1"
     [ bench "parser-regex T" $ nf english1PR t
