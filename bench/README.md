@@ -36,7 +36,7 @@ Performed using GHC 9.8.1.
 The suffixes indicate the sequence used for the benchmarks, `T` for `Text`,
 `S` for `String`, `BS` for `ByteString`.
 
-### English text 1
+#### English text 1
 
 | Library | Time | Alloc | Copied | Peak |
 | --- | --- | --- | --- | --- |
@@ -46,7 +46,7 @@ The suffixes indicate the sequence used for the benchmarks, `T` for `Text`,
 | regex-tdfa T | 38.6 ms ± 1.5 ms | 110 MB | 63 KB | 27 MB |
 | regex-pcre-builtin BS | 13.4 ms ± 698 μs | 406 KB | 8.4 KB | 27 MB |
 
-### English text 2
+#### English text 2
 
 | Library | Time | Alloc | Copied | Peak |
 | --- | --- | --- | --- | --- |
@@ -56,7 +56,7 @@ The suffixes indicate the sequence used for the benchmarks, `T` for `Text`,
 | regex-tdfa T | 27.2 ms ± 1.4 ms | 112 MB | 33 KB | 28 MB |
 | regex-pcre-builtin BS | 388 μs ± 30 μs | 298 KB | 3.1 KB | 27 MB |
 
-### English replace all
+#### English replace all
 
 | Library | Time | Alloc | Copied | Peak |
 | --- | --- | --- | --- | --- |
@@ -66,7 +66,7 @@ The suffixes indicate the sequence used for the benchmarks, `T` for `Text`,
 | regex-tdfa T | 200 ms ± 17 ms | 696 MB | 29 MB | 923 MB |
 | regex-pcre-builtin BS | 122 ms ± 12 ms | 586 MB | 29 MB | 921 MB |
 
-### Parse CaseFolding.txt
+#### Parse CaseFolding.txt
 
 | Library | Time | Alloc | Copied | Peak |
 | --- | --- | --- | --- | --- |
@@ -76,7 +76,7 @@ The suffixes indicate the sequence used for the benchmarks, `T` for `Text`,
 | regex-tdfa T | 39.7 ms ± 1.3 ms | 108 MB | 168 KB | 11 MB |
 | regex-pcre-builtin BS | 12.3 ms ± 683 μs | 4.0 MB | 402 KB | 11 MB |
 
-### Parse URI
+#### Parse URI
 
 | Library | Time | Alloc | Copied | Peak |
 | --- | --- | --- | --- | --- |
@@ -86,7 +86,7 @@ The suffixes indicate the sequence used for the benchmarks, `T` for `Text`,
 | regex-tdfa T | 192 ms ± 3.4 ms | 246 MB | 579 KB | 32 MB |
 | regex-pcre-builtin BS | 7.13 ms ± 259 μs | 13 MB | 9.2 MB | 48 MB |
 
-### Exponential backtracking
+#### Exponential backtracking
 
 | Library | Time | Alloc | Copied | Peak |
 | --- | --- | --- | --- | --- |
