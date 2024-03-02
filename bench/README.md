@@ -13,15 +13,15 @@ A comparison of some Haskell regex libraries:
 | Unicode aware | Yes | Yes | Yes | No |
 | Parsing features | Yes | Yes | Submatch only | Submatch only |
 | Extensions | No | No | No | Yes (lookahead, backreferences, etc.) |
-| Text matching speed (`English text 1`,`English text 2`) | Baseline | Slower | Faster | Very fast |
-| Text replace speed (`English replace all`) | Baseline | Slower | Slower [1] | Comparable [2] |
-| Parsing speed (`CaseFolding.txt`,`URI`) | Baseline | Slower | Comparable | Very fast |
+| Text matching speed<br/>(`English text 1,2`) | Baseline | Slower | Faster | Very fast |
+| Text replace speed<br/>(`English replace all`) | Baseline | Slower | Slower <sup>[1]</sup> | Comparable <sup>[2]</sup> |
+| Parsing speed<br/>(`CaseFolding.txt`,`URI`) | Baseline | Slower | Comparable | Very fast |
 | Regex compilation complexity | $O(m)$ | Undocumented, $O(m^2)$ judging by source code | Undocumented | Undocumented |
-| Parsing complexity | $O(mn \log m)$ | Documented "roughly linear complexity", $O(m^2 n \log m)$ judging by source code | $O(n)$ claimed [3] | Undocumented, $O(2^n)$ seen experimentally |
+| Parsing complexity | $O(mn \log m)$ | Documented "roughly linear complexity", $O(m^2 n \log m)$ judging by source code | $O(n)$ claimed <sup>[3]</sup> | Undocumented, $O(2^n)$ seen experimentally |
 
-1: Replacement requires a separate library, [`regex`](https://hackage.haskell.org/package/regex)  
-2: Replacement requires a separate library, [`regex-with-pcre`](https://hackage.haskell.org/package/regex-with-pcre)  
-3: I do not know if this is accurate, since $O(n)$ is only possible by spending
+<sup>1</sup> Replacement requires a separate library, [`regex`](https://hackage.haskell.org/package/regex)  
+<sup>2</sup> Replacement requires a separate library, [`regex-with-pcre`](https://hackage.haskell.org/package/regex-with-pcre)  
+<sup>3</sup> I do not know if this is accurate, since $O(n)$ is only possible by spending
    $O(2^m)$ on compilation, which libraries usually consider too great a cost.
    `regex-tdfa` mentions that it is based on the [`tre`](https://github.com/laurikari/tre/)
    library, which claims $O(m^2 n)$ time. This could be true of `regex-tdfa` also.
