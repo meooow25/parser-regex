@@ -1,3 +1,31 @@
+## Comparison
+
+A comparison of some Haskell regex libraries:
+
+* `parser-regex`
+* [`regex-applicative`](https://hackage.haskell.org/package/regex-applicative)
+* [`regex-tdfa`](https://hackage.haskell.org/package/regex-tdfa)
+* [`regex-pcre-builtin`](https://hackage.haskell.org/package/regex-pcre-builtin)
+
+| | `parser-regex` | `regex-applicative` | `regex-tdfa` | `regex-pcre-builtin` |
+| --- | --- | --- | --- | --- |
+| Regex construction | Combinators | Combinators | Pattern | Pattern |
+| Unicode aware | Yes | Yes | Yes | No |
+| Parsing features | Yes | Yes | Submatch only | Submatch only |
+| Extensions | No | No | No | Yes (lookahead, backreferences, etc.) |
+| Text matching speed (`English text 1`,`English text 2`) | Baseline | Slower | Faster | Very fast |
+| Text replace speed (`English replace all`) | Baseline | Slower | Slower [1] | Comparable [2] |
+| Parsing speed (`CaseFolding.txt`,`URI`) | Baseline | Slower | Comparable | Very fast |
+| Regex compilation complexity | $O(m)$ | Undocumented, $O(m^2)$ judging by source code | Undocumented | Undocumented |
+| Parsing complexity | $O(mn \log m)$ | Documented "roughly linear complexity", $O(m^2 n \log m)$ judging by source code | $O(n)$ claimed [3] | Undocumented, $O(2^n)$ seen experimentally |
+
+1: Replacement requires a separate library, [`regex`](https://hackage.haskell.org/package/regex)  
+2: Replacement requires a separate library, [`regex-with-pcre`](https://hackage.haskell.org/package/regex-with-pcre)  
+3: I do not know if this is accurate, since $O(n)$ is only possible by spending
+   $O(2^m)$ on compilation, which libraries usually consider too great a cost.
+   `regex-tdfa` mentions that it is based on the [`tre`](https://github.com/laurikari/tre/)
+   library, which claims $O(m^2 n)$ time. This could be true of `regex-tdfa` also.
+
 ## Benchmarks
 
 Benchmarks of regex libraries on some simple use cases. See `Compare.hs` for
@@ -36,10 +64,6 @@ The suffixes indicate the sequence used for the benchmarks, `T` for `Text`,
 | regex-applicative S | 368 ms ± 5.3 ms | 2.2 GB | 63 MB | 50 MB |
 | regex-tdfa T | 200 ms ± 17 ms | 696 MB | 29 MB | 923 MB |
 | regex-pcre-builtin BS | 122 ms ± 12 ms | 586 MB | 29 MB | 921 MB |
-
-Note: To perform replacements,
-* `regex-tdfa` requires a separate library, called `regex`
-* `regex-pcre-builtin` requires a separate library, called `regex-with-pcre`
 
 ### Parse CaseFolding.txt
 
