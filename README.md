@@ -1,5 +1,7 @@
 # parser-regex
 
+[![Haskell-CI](https://github.com/meooow25/parser-regex/actions/workflows/haskell-ci.yml/badge.svg)](https://github.com/meooow25/parser-regex/actions/workflows/haskell-ci.yml)
+
 Regex based parsers
 
 ## Features
