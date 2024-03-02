@@ -17,7 +17,7 @@ A comparison of some Haskell regex libraries:
 | Text replace speed<br/>(`English replace all`) | Baseline | Slower | Slower<sup>[2]</sup> | Comparable<sup>[3]</sup> |
 | Parsing speed<br/>(`CaseFolding.txt`,`URI`) | Baseline | Slower | Comparable | Very fast |
 | Regex compilation complexity | $O(m)$ | Undocumented, $O(m^2)$ judging by source code | Undocumented | Undocumented |
-| Parsing complexity | $O(mn \log m)$ | Documented "roughly linear complexity", $O(m^2 n \log m)$ judging by source code | $O(n)$ claimed <sup>[4]</sup> | Undocumented, $O(2^n)$ seen experimentally |
+| Parsing complexity | $O(mn \log m)$ | Documented "roughly linear complexity", $O(m^2 n \log m)$ judging by source code | $O(n)$ claimed<sup>[4]</sup> | Undocumented, $O(2^n)$ seen experimentally |
 
 <sup>1</sup> [`regex-pcre-builtin#3`](https://github.com/audreyt/regex-pcre-builtin/issues/3)  
 <sup>2</sup> Replacement requires a separate library, [`regex`](https://hackage.haskell.org/package/regex)  
