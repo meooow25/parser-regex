@@ -10,18 +10,19 @@ A comparison of some Haskell regex libraries:
 | | `parser-regex` | `regex-applicative` | `regex-tdfa` | `regex-pcre-builtin` |
 | --- | --- | --- | --- | --- |
 | Regex construction | Combinators | Combinators | Pattern | Pattern |
-| Unicode aware | Yes | Yes | Yes | No |
+| Unicode aware | Yes | Yes | Yes | No<sup>[1]</sup> |
 | Parsing features | Yes | Yes | Submatch only | Submatch only |
 | Extensions | No | No | No | Yes (lookahead, backreferences, etc.) |
 | Text matching speed<br/>(`English text 1,2`) | Baseline | Slower | Faster | Very fast |
-| Text replace speed<br/>(`English replace all`) | Baseline | Slower | Slower <sup>[1]</sup> | Comparable <sup>[2]</sup> |
+| Text replace speed<br/>(`English replace all`) | Baseline | Slower | Slower<sup>[2]</sup> | Comparable<sup>[3]</sup> |
 | Parsing speed<br/>(`CaseFolding.txt`,`URI`) | Baseline | Slower | Comparable | Very fast |
 | Regex compilation complexity | $O(m)$ | Undocumented, $O(m^2)$ judging by source code | Undocumented | Undocumented |
-| Parsing complexity | $O(mn \log m)$ | Documented "roughly linear complexity", $O(m^2 n \log m)$ judging by source code | $O(n)$ claimed <sup>[3]</sup> | Undocumented, $O(2^n)$ seen experimentally |
+| Parsing complexity | $O(mn \log m)$ | Documented "roughly linear complexity", $O(m^2 n \log m)$ judging by source code | $O(n)$ claimed <sup>[4]</sup> | Undocumented, $O(2^n)$ seen experimentally |
 
-<sup>1</sup> Replacement requires a separate library, [`regex`](https://hackage.haskell.org/package/regex)  
-<sup>2</sup> Replacement requires a separate library, [`regex-with-pcre`](https://hackage.haskell.org/package/regex-with-pcre)  
-<sup>3</sup> I do not know if this is accurate, since $O(n)$ is only possible by spending
+<sup>1</sup> [`regex-pcre-builtin#3`](https://github.com/audreyt/regex-pcre-builtin/issues/3)  
+<sup>2</sup> Replacement requires a separate library, [`regex`](https://hackage.haskell.org/package/regex)  
+<sup>3</sup> Replacement requires a separate library, [`regex-with-pcre`](https://hackage.haskell.org/package/regex-with-pcre)  
+<sup>4</sup> I do not know if this is accurate, since $O(n)$ is only possible by spending
    $O(2^m)$ on compilation, which libraries usually consider too great a cost.
    `regex-tdfa` mentions that it is based on the [`tre`](https://github.com/laurikari/tre/)
    library, which claims $O(m^2 n)$ time. This could be true of `regex-tdfa` also.
