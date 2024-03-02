@@ -2,7 +2,7 @@ cabal-version:      2.4
 name:               script
 version:            0.1.0.0
 
-executable compare
+executable script
     ghc-options: -Wall
 
     build-depends:

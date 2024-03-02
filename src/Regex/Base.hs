@@ -25,7 +25,6 @@ module Regex.Base
   , R.anySingle
   , R.single
   , R.satisfy
-  , R.foldable
   , R.foldlMany
   , R.foldlManyMin
   , R.Many(..)
@@ -66,7 +65,7 @@ import qualified Regex.Internal.Parser as P
 --
 -- The functions @prepareParser@, @stepParser@, and @finishParser@ grant
 -- a large amount of control over the parsing process, making it possible to
--- parse monadically, or in a branching manner, or even both.
+-- parse in a resumable or even branching manner.
 --
 -- As a simpler alternative to the trio of functions above, @parseFoldr@ can be
 -- used on any sequence type that can be folded over.

@@ -109,10 +109,11 @@ import qualified Regex.Internal.Text as T
 -- == Recursive definitions
 --
 -- It is not possible to define a @RE@ recursively. If it were permitted, it
--- would be capable of parsing more than [regular languages](https://en.wikipedia.org/wiki/Regular_language).
--- Unfortunately, there is no way to make it impossible to write such a regex
--- in the first place. So it must be avoided by the programmer. As an example,
--- avoid this:
+-- would be capable of parsing more than
+-- [regular languages](https://en.wikipedia.org/wiki/Regular_language).
+-- Unfortunately, there is no good way\* to make it impossible to write such
+-- a regex in the first place. So it must be avoided by the programmer. As an
+-- example, avoid this:
 --
 -- @
 -- re :: REText [Text]
@@ -132,6 +133,9 @@ import qualified Regex.Internal.Text as T
 -- If you find that your regex is impossible to write without recursion,
 -- you are attempting to parse a non-regular language! You need a more powerful
 -- parser than what this library has to offer.
+--
+-- \* [Unlifted datatypes](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/primitives.html#unlifted-datatypes)
+-- can serve this purpose but they are too inconvenient to work with.
 --
 -- == Laziness
 --
@@ -201,9 +205,9 @@ import qualified Regex.Internal.Text as T
 --   \(O(m)\) memory is required.
 -- * To parse some slice of the input @Text@ (using one of @manyText@,
 --   @manyTextOf@, etc.), memory required is \(O(1)\). For @toMatch r@, memory
---   required is \(O(m')\) where \(m'\) is the size of @r@.
+--   required is \(O(m' \min (m',n))\) where \(m'\) is the size of @r@.
 --
 -- This applies even as subcomponents. So, any subcomponent @RE@ of a larger
--- @RE@ that is only recognizing text or parsing a slice is cheap in terms of
+-- @RE@ that is only recognizing text or parsing a slice is cheaper in terms of
 -- memory.
 --

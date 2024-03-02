@@ -394,7 +394,6 @@ reParse re = let !p = P.compile re in parse p
 -- | \(O(mn \log m)\). Parse a @Text@ with a @ParserText@.
 parse :: ParserText a -> Text -> Maybe a
 parse = P.parseFoldr tokenFoldr
-{-# INLINE parse #-}
 
 -- | \(O(mn \log m)\). Parse a @Text@ with a @ParserText@. Calls 'error' on
 -- parse failure.
@@ -524,7 +523,7 @@ toReplace re = liftA2 f manyTextMin re <*> manyText
 --              \<*> digits 2 \<* sep
 --              \<*> digits 4
 -- @
--- >>> replaceMany date "01/01/1970, 01-04-1990, 03.07.2011"
+-- >>> replaceAll date "01/01/1970, 01-04-1990, 03.07.2011"
 -- "1970-01-01, 1990-04-01, 2011-07-03"
 --
 replaceAll :: REText Text -> Text -> Text
