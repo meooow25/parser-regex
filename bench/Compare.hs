@@ -83,37 +83,37 @@ benches = bgroup "compare"
     [ bench "parser-regex T" $ nf englishReplacePR t
     , bench "parser-regex S" $ nf englishReplacePRS s
     , bench "regex-applicative S" $ nf englishReplaceRA s
-    , bench "regex T" $ nf englishReplaceTDFA t
-    , bench "regex-with-pcre B" $ nf englishReplacePCRE b
+    , bench "regex-tdfa T" $ nf englishReplaceTDFA t
+    , bench "regex-pcre-builtin BS" $ nf englishReplacePCRE b
     , testGroup "tests"
       [ testCase "S == T" $ T.pack (englishReplacePRS s) @?= englishReplacePR t
       , testCase "regex-applicative ==" $ T.pack (englishReplaceRA s) @?= englishReplacePR t
-      , testCase "regex ==" $ englishReplaceTDFA t @?= englishReplacePR t
-      , testCase "regex-with-pcre ==" $ englishReplacePCRE b @?= TEnc.encodeUtf8 (englishReplacePR t)
+      , testCase "regex-tdfa ==" $ englishReplaceTDFA t @?= englishReplacePR t
+      , testCase "regex-pcre-builtin ==" $ englishReplacePCRE b @?= TEnc.encodeUtf8 (englishReplacePR t)
       ]
     ]
   , env caseFoldingTxt $ \ ~(t,b,s) ->
-    bgroup "CaseFolding.txt"
+    bgroup "Parse CaseFolding.txt"
     [ bench "parser-regex T" $ nf caseFoldingPR t
     , bench "parser-regex S" $ nf caseFoldingPRS s
     , bench "regex-applicative S" $ nf caseFoldingRA s
     , bench "regex-tdfa T" $ nf caseFoldingTDFA t
-    , bench "regex-pcre B" $ nf caseFoldingPCRE b
+    , bench "regex-pcre-builtin BS" $ nf caseFoldingPCRE b
     , testGroup "tests"
       [ testCase "check count" $ length (caseFoldingPR t) @?= 1563
       , testCase "S == T" $ caseFoldingPRS s @?= caseFoldingPR t
       , testCase "regex-applicative ==" $ caseFoldingRA s @?= caseFoldingPR t
       , testCase "regex-tdfa ==" $ caseFoldingTDFA t @?= caseFoldingPR t
-      , testCase "regex-pcre ==" $ caseFoldingPCRE b @?= caseFoldingPR t
+      , testCase "regex-pcre-builtin ==" $ caseFoldingPCRE b @?= caseFoldingPR t
       ]
     ]
   , env htmlText $ \ ~(t,b,s) ->
-    bgroup "URI"
+    bgroup "Parse URI"
     [ bench "parser-regex T" $ nf uriPR t
     , bench "parser-regex S" $ nf uriPRS s
     , bench "regex-applicative S" $ nf uriRA s
     , bench "regex-tdfa T" $ nf uriTDFA t
-    , bench "regex-pcre-builtin B" $ nf uriPCRE b
+    , bench "regex-pcre-builtin BS" $ nf uriPCRE b
     , testGroup "tests"
       [ testCase "check count" $ length (uriPR t) @?= 4277
       , testCase "S == T" $ map uriS2T (uriPRS s) @?= uriPR t
@@ -127,7 +127,7 @@ benches = bgroup "compare"
     , bench "parser-regex S" $ whnf expPRS expString
     , bench "regex-applicative S" $ whnf expRA expString
     , bench "regex-tdfa T" $ whnf expTDFA expText
-    , bench "regex-pcre-builtin B" $ whnf expPCRE expBS
+    , bench "regex-pcre-builtin BS" $ whnf expPCRE expBS
     , testGroup "tests"
       [ testCase "parser-regex T True" $ expPR expText @?= True
       , testCase "parser-regex S True" $ expPRS expString @?= True
