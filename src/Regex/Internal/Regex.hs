@@ -44,6 +44,7 @@ import Control.Applicative
 import Control.DeepSeq (NFData(..), NFData1(..), rnf1)
 import Control.Monad
 import Data.Functor.Classes (Eq1(..), Ord1(..), Show1(..), showsUnaryWith)
+import Data.Semigroup (Semigroup(..))
 import qualified Data.Foldable as F
 
 ---------------------------------
@@ -118,6 +119,22 @@ instance Alternative (RE c) where
   (<|>) = RAlt
   some re = liftA2' (:) re (many re)
   many = fmap reverse . foldlMany' (flip (:)) []
+
+-- | @(<>) = liftA2 (<>)@
+instance Semigroup a => Semigroup (RE c a) where
+  (<>) = liftA2 (<>)
+  sconcat = fmap sconcat . sequenceA
+  {-# INLINE sconcat #-}
+
+-- | @mempty = pure mempty@
+instance Monoid a => Monoid (RE c a) where
+  mempty = pure mempty
+  mconcat = fmap mconcat . sequenceA
+  {-# INLINE mconcat #-}
+-- Use the underlying type's sconcat/mconcat because it may be more efficient
+-- than the default right-associative definition.
+-- stimes is not defined here since there is no way to delegate to the stimes
+-- of a.
 
 -- | Parse a @c@ into an @a@ if the given function returns @Just@.
 token :: (c -> Maybe a) -> RE c a
