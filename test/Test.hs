@@ -8,7 +8,9 @@ import Control.Monad
 import Data.Char
 import qualified Data.List as L
 import Data.Maybe
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Proxy
+import Data.Semigroup
 import Data.String
 import qualified Numeric as Num
 import Numeric.Natural
@@ -1157,6 +1159,20 @@ combinatorTests = testGroup "Combinators"
       [ let re = (1 :: Int) <$ RT.char 'a' <|> 2 <$ RT.char 'a' in
         testPM "1 <$ a <|> 2 <$ a, a, ok" re "a" (Just 1)
       ]
+    ]
+  , testGroup "Semigroup,Monoid" $
+    let go abc =
+          [ testPM "<e>, fail" abc "" Nothing
+          , testPM "a, fail" abc "a" Nothing
+          , testPM "bc, fail" abc "bc" Nothing
+          , testPM "abc, ok" abc "abc" (Just "abc")
+          ]
+    in
+    [ testGroup "<>" $ go (RT.text "a" <> RT.text "bc")
+    , testGroup "<> mempty" $ go (RT.text "abc" <> mempty)
+    , testGroup "mempty <>" $ go (mempty <> RT.text "abc")
+    , testGroup "sconcat" $ go (sconcat (RT.text "a" :| [RT.text "b", RT.text "c"]))
+    , testGroup "mconcat" $ go (mconcat [RT.text "a", RT.text "b", RT.text "c"])
     ]
   , testGroup "many" $
     let a = many (RT.char 'a')
