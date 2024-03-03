@@ -142,7 +142,8 @@ absw x = if x == minBound
 -------------------
 
 -- Make a tree based on the range. Keep the tree size small where possible.
--- This is hard to explain in words, so see <link> for some pictures.
+-- This is hard to explain in words, so see here for some pictures:
+-- https://github.com/meooow25/parser-regex/wiki/Visualizations#int-range
 
 mkWordRangeBase
   :: forall c.
