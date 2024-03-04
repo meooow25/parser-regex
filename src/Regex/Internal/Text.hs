@@ -401,7 +401,6 @@ parse = P.parseFoldr tokenFoldr
 -- For use with parsers that are known to never fail.
 parseSure :: ParserText a -> Text -> a
 parseSure p = fromMaybe parseSureError . parse p
-{-# INLINE parseSure #-}
 
 parseSureError :: a
 parseSureError = errorWithoutStackTrace
@@ -469,10 +468,10 @@ findAll = reParseSure . R.toFindMany
 -- >>> splitOn (char ' ' *> oneOf "+-=" *> char ' ') "3 - 1 + 1/2 - 2 = 0"
 -- ["3","1","1/2","2","0"]
 --
--- If the list starts or ends with a delimiter, the result will contain
--- empty lists at those positions.
+-- If the @Text@ starts or ends with a delimiter, the result will contain
+-- empty @Text@s at those positions.
 --
--- >>> splitOn (single 'a') "ayaya"
+-- >>> splitOn (char 'a') "ayaya"
 -- ["","y","y",""]
 --
 splitOn :: REText a -> Text -> [Text]

@@ -1,5 +1,6 @@
 # parser-regex
 
+[![Hackage](https://img.shields.io/hackage/v/parser-regex?logo=haskell&color=blue)](https://hackage.haskell.org/package/parser-regex)
 [![Haskell-CI](https://github.com/meooow25/parser-regex/actions/workflows/haskell-ci.yml/badge.svg)](https://github.com/meooow25/parser-regex/actions/workflows/haskell-ci.yml)
 
 Regex based parsers
@@ -17,14 +18,14 @@ Regex based parsers
 * Parsing runtime is linear in the length of the sequence being parsed. No
   exponential backtracking.
 
-## Usage
+## Example
 
 ```hs
 {-# LANGUAGE OverloadedStrings #-}
 import Control.Applicative (optional)
 import Data.Text (Text)
-import qualified Data.Text as T
 
+import Regex.Text (REText)
 import qualified Regex.Text as R
 import qualified Data.CharSet as CS
 
@@ -39,21 +40,30 @@ data URI = URI
 -- ^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?
 -- A non-validating regex to extract parts of a URI, from RFC 3986
 -- Translated:
-uriRE :: R.REText URI
+uriRE :: REText URI
 uriRE = URI
   <$> optional (R.someTextOf (CS.not ":/?#") <* R.char ':')
   <*> optional (R.text "//" *> R.manyTextOf (CS.not "/?#"))
   <*> R.manyTextOf (CS.not "?#")
   <*> optional (R.char '?' *> R.manyTextOf (CS.not "#"))
   <*> optional (R.char '#' *> R.manyText)
-
--- >>> R.reParse uriRE "https://github.com/meooow25/parser-regex?tab=readme-ov-file#parser-regex"
--- Just (URI { scheme = Just "https"
---           , authority = Just "github.com"
---           , path = "/meooow25/parser-regex"
---           , query = Just "tab=readme-ov-file"
---           , fragment = Just "parser-regex" })
 ```
+```hs
+>>> R.reParse uriRE "https://github.com/meooow25/parser-regex?tab=readme-ov-file#parser-regex"
+Just (URI { scheme = Just "https"
+          , authority = Just "github.com"
+          , path = "/meooow25/parser-regex"
+          , query = Just "tab=readme-ov-file"
+          , fragment = Just "parser-regex" })
+```
+
+## Documentation
+
+Please find the documentation on Hackage:
+[parser-regex](https://hackage.haskell.org/package/parser-regex)
+
+Already familiar with regex patterns? See the
+[Regex pattern cheat sheet](https://github.com/meooow25/parser-regex/wiki/Regex-pattern-cheat-sheet).
 
 ## Alternatives
 
