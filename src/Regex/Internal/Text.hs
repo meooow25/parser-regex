@@ -501,8 +501,8 @@ toReplace re = liftA2 f manyTextMin re <*> manyText
   where
     f a b c = reverseConcat [c,b,a]
 
--- | \(O(mn \log m)\). Replace non-overlapping matches of the given @RE@ with
--- their results.
+-- | \(O(mn \log m)\). Replace all non-overlapping matches of the given @RE@
+-- with their results.
 --
 -- ==== __Examples__
 --
@@ -511,7 +511,7 @@ toReplace re = liftA2 f manyTextMin re <*> manyText
 --
 -- For simple replacements like above, prefer @Data.Text.'Data.Text.replace'@.
 --
--- >>> replaceAll ("Fruit" <$ text "Time" <|> "banana" <$ text "arrow") "Time flies like an arrow"
+-- >>> replaceAll ("Fruit" <$ text "Time" <|> "a banana" <$ text "an arrow") "Time flies like an arrow"
 -- "Fruit flies like a banana"
 --
 -- @

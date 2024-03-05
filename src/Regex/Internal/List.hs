@@ -415,15 +415,15 @@ toReplace re = liftA2 f manyListMin re <*> manyList
   where
     f a b c = concat [a,b,c]
 
--- | \(O(mn \log m)\). Replace non-overlapping matches of the given @RE@ with
--- their results.
+-- | \(O(mn \log m)\). Replace all non-overlapping matches of the given @RE@
+-- with their results.
 --
 -- ==== __Examples__
 --
 -- >>> replaceAll (" and " <$ list ", ") "red, blue, green"
 -- "red and blue and green"
 --
--- >>> replaceAll ("Fruit" <$ list "Time" <|> "banana" <$ list "arrow") "Time flies like an arrow"
+-- >>> replaceAll ("Fruit" <$ list "Time" <|> "a banana" <$ list "an arrow") "Time flies like an arrow"
 -- "Fruit flies like a banana"
 --
 -- @
