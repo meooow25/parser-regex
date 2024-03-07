@@ -1,3 +1,7 @@
+#!/usr/bin/env cabal
+{- cabal:
+build-depends: base, containers, parser-regex, text
+-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
 
@@ -14,9 +18,6 @@ import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.IO.Utf8 as T
 import qualified Regex.Text as R
-
--- TODO: Switch to cabal script once it's on Hackage.
--- Otherwise it doesn't work: https://github.com/haskell/cabal/issues/8562
 
 main :: IO ()
 main = do
