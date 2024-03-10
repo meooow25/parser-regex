@@ -39,18 +39,18 @@ data Parser c a where
   PPure   :: a -> Parser c a
   PLiftA2 :: !Strictness -> !(a1 -> a2 -> a) -> !(Parser c a1) -> !(Parser c a2) -> Parser c a
   PEmpty  :: Parser c a
-  PAlt    :: !Unique -> !(Parser c a) -> !(Parser c a) -> !(SmallArray (Parser c a)) -> Parser c a
-  PFoldGr :: !Unique -> !Strictness -> !(a -> a1 -> a) -> a -> !(Parser c a1) -> Parser c a
-  PFoldMn :: !Unique -> !Strictness -> !(a -> a1 -> a) -> a -> !(Parser c a1) -> Parser c a
-  PMany   :: !Unique -> !(a1 -> a) -> !(a2 -> a) -> !(a2 -> a1 -> a2) -> !a2 -> !(Parser c a1) -> Parser c a
+  PAlt    :: {-# UNPACK #-} !Unique -> !(Parser c a) -> !(Parser c a) -> {-# UNPACK #-} !(SmallArray (Parser c a)) -> Parser c a
+  PFoldGr :: {-# UNPACK #-} !Unique -> !Strictness -> !(a -> a1 -> a) -> a -> !(Parser c a1) -> Parser c a
+  PFoldMn :: {-# UNPACK #-} !Unique -> !Strictness -> !(a -> a1 -> a) -> a -> !(Parser c a1) -> Parser c a
+  PMany   :: {-# UNPACK #-} !Unique -> !(a1 -> a) -> !(a2 -> a) -> !(a2 -> a1 -> a2) -> !a2 -> !(Parser c a1) -> Parser c a
 
 -- | A node in the NFA. Used for recognition.
 data Node c a where
   NAccept :: a -> Node c a
-  NGuard  :: !Unique -> Node c a -> Node c a
+  NGuard  :: {-# UNPACK #-} !Unique -> Node c a -> Node c a
   NToken  :: !(c -> Maybe a1) -> !(Node c a) -> Node c a
   NEmpty  :: Node c a
-  NAlt    :: !(Node c a) -> !(Node c a) -> !(SmallArray (Node c a)) -> Node c a
+  NAlt    :: !(Node c a) -> !(Node c a) -> {-# UNPACK #-} !(SmallArray (Node c a)) -> Node c a
 -- Note that NGuard is lazy in the node. We have to introduce laziness in
 -- at least one place, to make a graph with loops possible.
 
@@ -186,10 +186,10 @@ data Cont c b a where
   CFmap_   :: !(Node c a1) -> !(Cont c a1 a) -> Cont c b a
   CLiftA2A :: !Strictness -> !(b -> a2 -> a3) -> !(Parser c a2) -> !(Cont c a3 a) -> Cont c b a
   CLiftA2B :: !Strictness -> !(a1 -> b -> a3) -> a1 -> !(Cont c a3 a) -> Cont c b a
-  CAlt     :: !Unique -> !(Cont c b a) -> Cont c b a
-  CFoldGr  :: !Unique -> !Strictness -> !(Parser c b) -> !(a1 -> b -> a1) -> a1 -> !(Cont c a1 a) -> Cont c b a
-  CFoldMn  :: !Unique -> !Strictness -> !(Parser c b) -> !(a1 -> b -> a1) -> a1 -> !(Cont c a1 a) -> Cont c b a
-  CMany    :: !Unique -> !(Parser c b) -> !(b -> a2) -> !(a1 -> a2) -> !(a1 -> b -> a1) -> !a1 -> !(Cont c a2 a) -> Cont c b a
+  CAlt     :: {-# UNPACK #-} !Unique -> !(Cont c b a) -> Cont c b a
+  CFoldGr  :: {-# UNPACK #-} !Unique -> !Strictness -> !(Parser c b) -> !(a1 -> b -> a1) -> a1 -> !(Cont c a1 a) -> Cont c b a
+  CFoldMn  :: {-# UNPACK #-} !Unique -> !Strictness -> !(Parser c b) -> !(a1 -> b -> a1) -> a1 -> !(Cont c a1 a) -> Cont c b a
+  CMany    :: {-# UNPACK #-} !Unique -> !(Parser c b) -> !(b -> a2) -> !(a1 -> a2) -> !(a1 -> b -> a1) -> !a1 -> !(Cont c a2 a) -> Cont c b a
 
 data NeedCList c a where
   NeedCCons :: !(c -> Maybe b) -> !(Cont c b a) -> !(NeedCList c a) -> NeedCList c a
