@@ -27,7 +27,7 @@ import Prelude hiding (not, map)
 import qualified Prelude
 import Data.Char
 import Data.String
-import Data.Foldable (foldl')
+import qualified Data.Foldable as F
 import qualified Data.IntMap.Strict as IM
 import Data.Semigroup (Semigroup(..), stimesIdempotentMonoid)
 import GHC.Exts (Int(..), Char(..), chr#)
@@ -53,14 +53,14 @@ instance IsString CharSet where
 -- | @(<>) = 'union'@
 instance Semigroup CharSet where
   (<>) = union
-  sconcat = foldl' union empty
+  sconcat = F.foldl' union empty
   {-# INLINE sconcat #-}
   stimes = stimesIdempotentMonoid
 
 -- | @mempty = 'empty'@
 instance Monoid CharSet where
   mempty = empty
-  mconcat = foldl' union empty
+  mconcat = F.foldl' union empty
   {-# INLINE mconcat #-}
 
 -- | The empty set.
@@ -78,12 +78,12 @@ fromRange (cl,ch) = CharSet (IM.singleton (ord cl) ch)
 
 -- | \(O(s \min(s,C))\). Create a set from @Char@s in a list.
 fromList :: [Char] -> CharSet
-fromList = foldl' (flip insert) empty
+fromList = F.foldl' (flip insert) empty
 {-# INLINE fromList #-}
 
 -- | \(O(n \min(n,C))\). Create a set from the given @Char@ ranges (inclusive).
 fromRanges :: [(Char, Char)] -> CharSet
-fromRanges = foldl' (flip insertRange) empty
+fromRanges = F.foldl' (flip insertRange) empty
 {-# INLINE fromRanges #-}
 
 -- | \(O(\min(n,C))\). Insert a @Char@ into a set.

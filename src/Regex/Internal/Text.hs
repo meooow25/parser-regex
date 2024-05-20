@@ -49,7 +49,7 @@ module Regex.Internal.Text
 
 import Control.Applicative
 import Data.Char
-import Data.Foldable (foldl')
+import qualified Data.Foldable as F
 import Data.Maybe (fromMaybe)
 import Numeric.Natural
 import Data.Text (Text)
@@ -558,7 +558,7 @@ reverseConcat ts = case ts of
       | otherwise = reverseConcatOverflowError
       where
         acc' = acc + l
-    len = foldl' flen 0 ts
+    len = F.foldl' flen 0 ts
     arr = TArray.run $ do
       marr <- TArray.new len
       let loop !_ [] = pure marr
