@@ -22,6 +22,7 @@ import Control.Monad.Fix
 import Data.Maybe (isJust)
 import Data.Primitive.SmallArray
 import qualified Data.Foldable as F
+import qualified GHC.Exts as X
 
 import Regex.Internal.Regex (RE(..), Strictness(..), Greediness(..))
 import Regex.Internal.Unique (Unique(..), UniqueSet)
@@ -368,7 +369,7 @@ type Foldr f a = forall b. (a -> b -> b) -> b -> f -> b
 parseFoldr :: Foldr f c -> Parser c a -> f -> Maybe a
 parseFoldr fr = \p xs -> fr f finishParser xs (prepareParser p)
   where
-    f c k = \ps -> stepParser ps c >>= k
+    f c k = X.oneShot (\ps -> stepParser ps c >>= k)
 {-# INLINE parseFoldr #-}
 
 ---------
