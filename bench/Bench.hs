@@ -3,6 +3,7 @@
 module Bench (benches) where
 
 import Control.Applicative
+import Control.DeepSeq (NFData(..))
 import Control.Monad
 import Control.Monad.Random.Strict
 import qualified Data.Foldable as F
@@ -18,6 +19,7 @@ import qualified Regex.Base as RB
 benches :: Benchmark
 benches = bgroup "parser-regex"
   [ textBenches
+  , intTreeBenches
   ]
 
 ---------
@@ -175,6 +177,61 @@ manyRanges = evalR $ replicateM 100000 getRandom
 bigExpr :: Text
 bigExpr = T.intercalate "+" $ map (T.pack . show) . evalR $
   replicateM 100000 (getRandom :: R Word)
+
+------------
+-- IntTree
+------------
+
+-- These benchmarks are primarily to test that parsing works well with
+-- structures that are not [] or Text, such as trees. The performance depends on
+-- the foldr implementation, so we test two possible implementations here.
+
+intTreeBenches :: Benchmark
+intTreeBenches = bgroup "IntTree"
+  [ env (pure bigTree) $ \data_ ->
+    bgroup "foldlMany' anySingle"
+    [ bench "foldrTree" $ whnf (treeParse manyAnyP) data_
+    , bench "foldrTreeStack" $ whnf (treeParseStack manyAnyP) data_
+    ]
+  ]
+  where
+    !manyAnyP = RB.compile $ RB.foldlMany' (\_ _ -> ()) () RB.anySingle
+
+data IntTree = Bin !IntTree !Int !IntTree | Tip
+
+instance NFData IntTree where
+  rnf !_ = ()
+
+foldrTree :: (Int -> b -> b) -> b -> IntTree -> b
+foldrTree f z0 t = go t z0
+  where
+    go Tip z = z
+    go (Bin l x r) z = go l (f x (go r z))
+
+treeParse :: RB.Parser Int a -> IntTree -> Maybe a
+treeParse = RB.parseFoldr foldrTree
+
+data Stack = Push !Int !IntTree !Stack | Nada
+
+foldrTreeStack :: (Int -> b -> b) -> b -> IntTree -> b
+foldrTreeStack f z0 t = go (down t Nada)
+  where
+    go Nada = z0
+    go (Push x r stk) = f x (go (down r stk))
+    down Tip stk = stk
+    down (Bin l x r) stk = down l (Push x r stk)
+
+treeParseStack :: RB.Parser Int a -> IntTree -> Maybe a
+treeParseStack = RB.parseFoldr foldrTreeStack
+
+bigTree :: IntTree
+bigTree = go 100000 0
+  where
+    go 0 !_ = Tip
+    go n i = Bin (go ln i) (i+ln) (go rn (i+ln+1))
+      where
+        ln = (n-1) `div` 2
+        rn = n-1-ln
 
 -----------
 -- Random
