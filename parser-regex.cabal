@@ -38,18 +38,18 @@ library
         Regex.Base
         Regex.List
         Regex.Text
-
-    other-modules:
         Regex.Internal.CharSet
-        Regex.Internal.CharSets
         Regex.Internal.Debug
-        Regex.Internal.Generated.CaseFold
-        Regex.Internal.List
-        Regex.Internal.Num
         Regex.Internal.Parser
         Regex.Internal.Regex
         Regex.Internal.Text
         Regex.Internal.Unique
+
+    other-modules:
+        Regex.Internal.CharSets
+        Regex.Internal.Generated.CaseFold
+        Regex.Internal.List
+        Regex.Internal.Num
 
     build-depends:
         base >= 4.15 && < 5.0

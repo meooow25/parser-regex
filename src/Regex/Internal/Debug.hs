@@ -1,6 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
+-- | This module provides functions for visualizing @RE@s and @Parser@s.
+-- [See here](https://github.com/meooow25/parser-regex/wiki/Visualizations)
+-- for some examples.
+--
 module Regex.Internal.Debug
   ( reToDot
   , parserToDot
@@ -29,7 +34,7 @@ import qualified Regex.Internal.CharSet as CS
 
 -- | Generate a [Graphviz DOT](https://graphviz.org/doc/info/lang.html)
 -- visualization of a 'RE'. Optionally takes an alphabet @[c]@, which will be
--- tested against the 'token' functions in the 'RE' and accepted characters
+-- tested against the @token@ functions in the 'RE' and accepted characters
 -- displayed.
 reToDot :: forall c a. Maybe ([c], [c] -> String) -> RE c a -> String
 reToDot ma re0 = execM $ do
@@ -69,7 +74,7 @@ reToDot ma re0 = execM $ do
 
 -- | Generate a [Graphviz DOT](https://graphviz.org/doc/info/lang.html)
 -- visualization of a 'Parser'. Optionally takes an alphabet @[c]@, which will
--- be tested against the 'token' functions in the 'Parser' and the accepted
+-- be tested against the @token@ functions in the 'Parser' and the accepted
 -- characters displayed.
 parserToDot :: forall c a. Maybe ([c], [c] -> String) -> Parser c a -> String
 parserToDot ma p0 = execM $ do
@@ -133,6 +138,9 @@ parserToDot ma p0 = execM $ do
 -- Display Chars
 ------------------
 
+-- |
+-- >>> dispCharRanges "abc012def"
+-- "[('0','2'),('a','f')]"
 dispCharRanges :: [Char] -> String
 dispCharRanges = show . CS.ranges . CS.fromList
 

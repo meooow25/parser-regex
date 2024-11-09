@@ -2,6 +2,15 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_HADDOCK not-home #-}
+
+-- | This is an internal module. You probably don't need to import this.
+--
+-- = WARNING
+--
+-- Definitions in this module allow violating invariants that would otherwise be
+-- guaranteed by non-internal modules. Use at your own risk!
+--
 module Regex.Internal.Parser
   ( Parser(..)
   , Node(..)

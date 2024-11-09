@@ -1,5 +1,9 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
+{-# OPTIONS_HADDOCK not-home #-}
+
+-- | This is an internal module. You probably don't need to import this.
+--
 module Regex.Internal.Regex
   ( RE(..)
   , Strictness(..)
@@ -180,6 +184,7 @@ anySingle = token Just
 -- Many
 ---------
 
+-- | A repeating value or a finite list.
 data Many a
   = Repeat a   -- ^ A single value repeating indefinitely
   | Finite [a] -- ^ A finite list

@@ -1,8 +1,19 @@
 {-# LANGUAGE BangPatterns #-}
+{-# OPTIONS_HADDOCK not-home #-}
+
+-- | This is an internal module. You probably don't need to import this. Import
+-- "Regex.Text" instead.
+--
+-- = WARNING
+--
+-- Definitions in this module allow violating invariants that would otherwise be
+-- guaranteed by non-internal modules. Use at your own risk!
+--
 module Regex.Internal.Text
   (
-    TextToken
+    TextToken(..)
   , REText
+  , textTokenFoldr
 
   , token
   , satisfy
@@ -77,6 +88,10 @@ import qualified Regex.Internal.Generated.CaseFold as CF
 -- This module uses RE TextToken for Text regexes instead of simply RE Char to
 -- support Text slicing. It does mean that use cases not using slicing pay a
 -- small cost, but it is not worth having two separate Text regex APIs.
+--
+-- Slicing is made possible by the unsafeAdjacentAppend function. Of course,
+-- this means that REs using it MUST NOT be used with multiple Texts, such as
+-- trying to parse chunks of a lazy Text.
 data TextToken = TextToken
   { tArr     :: {-# UNPACK #-} !TArray.Array
   , tOffset  :: {-# UNPACK #-} !Int
@@ -137,47 +152,47 @@ text t = t <$ T.foldr' ((*>) . char) (pure ()) t
 -- as described by the Unicode standard.
 textIgnoreCase :: Text -> REText Text
 textIgnoreCase t =
-  T.foldr' (\c cs -> R.liftA2' adjacentAppend (ignoreCaseTokenMatch c) cs)
+  T.foldr' (\c cs -> R.liftA2' unsafeAdjacentAppend (ignoreCaseTokenMatch c) cs)
            (pure T.empty)
            t
 -- See Note [Why simple case fold]
 
 -- | Parse any @Text@. Biased towards matching more.
 manyText :: REText Text
-manyText = R.foldlMany' adjacentAppend T.empty anyTokenMatch
+manyText = R.foldlMany' unsafeAdjacentAppend T.empty anyTokenMatch
 
 -- | Parse any non-empty @Text@. Biased towards matching more.
 someText :: REText Text
-someText = R.liftA2' adjacentAppend anyTokenMatch manyText
+someText = R.liftA2' unsafeAdjacentAppend anyTokenMatch manyText
 
 -- | Parse any @Text@. Minimal, i.e. biased towards matching less.
 manyTextMin :: REText Text
-manyTextMin = R.foldlManyMin' adjacentAppend T.empty anyTokenMatch
+manyTextMin = R.foldlManyMin' unsafeAdjacentAppend T.empty anyTokenMatch
 
 -- | Parse any non-empty @Text@. Minimal, i.e. biased towards matching less.
 someTextMin :: REText Text
-someTextMin = R.liftA2' adjacentAppend anyTokenMatch manyTextMin
+someTextMin = R.liftA2' unsafeAdjacentAppend anyTokenMatch manyTextMin
 
 -- | Parse any @Text@ containing members of the @CharSet@.
 -- Biased towards matching more.
 manyTextOf :: CharSet -> REText Text
-manyTextOf !cs = R.foldlMany' adjacentAppend T.empty (oneOfTokenMatch cs)
+manyTextOf !cs = R.foldlMany' unsafeAdjacentAppend T.empty (oneOfTokenMatch cs)
 
 -- | Parse any non-empty @Text@ containing members of the @CharSet@.
 -- Biased towards matching more.
 someTextOf :: CharSet -> REText Text
-someTextOf !cs = R.liftA2' adjacentAppend (oneOfTokenMatch cs) (manyTextOf cs)
+someTextOf !cs = R.liftA2' unsafeAdjacentAppend (oneOfTokenMatch cs) (manyTextOf cs)
 
 -- | Parse any @Text@ containing members of the @CharSet@.
 -- Minimal, i.e. biased towards matching less.
 manyTextOfMin :: CharSet -> REText Text
-manyTextOfMin !cs = R.foldlManyMin' adjacentAppend T.empty (oneOfTokenMatch cs)
+manyTextOfMin !cs = R.foldlManyMin' unsafeAdjacentAppend T.empty (oneOfTokenMatch cs)
 
 -- | Parse any non-empty @Text@ containing members of the @CharSet@.
 -- Minimal, i.e. biased towards matching less.
 someTextOfMin :: CharSet -> REText Text
 someTextOfMin !cs =
-  R.liftA2' adjacentAppend (oneOfTokenMatch cs) (manyTextOfMin cs)
+  R.liftA2' unsafeAdjacentAppend (oneOfTokenMatch cs) (manyTextOfMin cs)
 
 -----------------
 -- Numeric REs
@@ -314,11 +329,14 @@ toMatch = go
       RFmap _ _ re1 -> go re1
       RFmap_ _ re1 -> go re1
       RPure _ -> RPure T.empty
-      RLiftA2 _ _ re1 re2 -> RLiftA2 Strict adjacentAppend (go re1) (go re2)
+      RLiftA2 _ _ re1 re2 ->
+        RLiftA2 Strict unsafeAdjacentAppend (go re1) (go re2)
       REmpty -> REmpty
       RAlt re1 re2 -> RAlt (go re1) (go re2)
-      RMany _ _ _ _ re1 -> RFold Strict Greedy adjacentAppend T.empty (go re1)
-      RFold _ gr _ _ re1 -> RFold Strict gr adjacentAppend T.empty (go re1)
+      RMany _ _ _ _ re1 ->
+        RFold Strict Greedy unsafeAdjacentAppend T.empty (go re1)
+      RFold _ gr _ _ re1 ->
+        RFold Strict gr unsafeAdjacentAppend T.empty (go re1)
 
 data WithMatch a = WM {-# UNPACK #-} !Text a
 
@@ -330,10 +348,10 @@ fmapWM' f (WM t x) = WM t $! f x
 
 instance Applicative WithMatch where
   pure = WM T.empty
-  liftA2 f (WM t1 x) (WM t2 y) = WM (adjacentAppend t1 t2) (f x y)
+  liftA2 f (WM t1 x) (WM t2 y) = WM (unsafeAdjacentAppend t1 t2) (f x y)
 
 liftA2WM' :: (a1 -> a2 -> b) -> WithMatch a1 -> WithMatch a2 -> WithMatch b
-liftA2WM' f (WM t1 x) (WM t2 y) = WM (adjacentAppend t1 t2) $! f x y
+liftA2WM' f (WM t1 x) (WM t2 y) = WM (unsafeAdjacentAppend t1 t2) $! f x y
 
 -- | Rebuild the @RE@ to include the matched @Text@ alongside the result.
 withMatch :: REText a -> REText (Text, a)
@@ -368,13 +386,13 @@ withMatch = R.fmap' (\(WM t x) -> (t,x)) . go
 -- Parse
 ----------
 
-tokenFoldr :: (TextToken -> b -> b) -> b -> Text -> b
-tokenFoldr f z (TInternal.Text a o0 l) = loop o0
+textTokenFoldr :: (TextToken -> b -> b) -> b -> Text -> b
+textTokenFoldr f z (TInternal.Text a o0 l) = loop o0
   where
     loop o | o - o0 >= l = z
     loop o = case TUnsafe.iterArray a o of
       TUnsafe.Iter c clen -> f (TextToken a o c) (loop (o + clen))
-{-# INLINE tokenFoldr #-}
+{-# INLINE textTokenFoldr #-}
 
 -- | \(O(mn \log m)\). Parse a @Text@ with a @REText@.
 --
@@ -393,7 +411,7 @@ reParse re = let !p = P.compile re in parse p
 
 -- | \(O(mn \log m)\). Parse a @Text@ with a @ParserText@.
 parse :: ParserText a -> Text -> Maybe a
-parse = P.parseFoldr tokenFoldr
+parse = P.parseFoldr textTokenFoldr
 
 -- | \(O(mn \log m)\). Parse a @Text@ with a @ParserText@. Calls 'error' on
 -- parse failure.
@@ -516,7 +534,7 @@ toReplace re = liftA2 f manyTextMin re <*> manyText
 --
 -- @
 -- sep = 'oneOf' "-./"
--- digits n = 'toMatch' ('replicateM_' n (oneOf 'Data.CharSet.digit'))
+-- digits n = 'toMatch' ('Control.Monad.replicateM_' n (oneOf 'Data.CharSet.digit'))
 -- toYmd d m y = mconcat [y, \"-\", m, \"-\", d]
 -- date = toYmd \<$> digits 2 \<* sep
 --              \<*> digits 2 \<* sep
@@ -539,8 +557,8 @@ toReplaceMany re =
 
 -- WARNING: If t1 and t2 are not empty, they must be adjacent slices of the
 -- same Text. In other words, sameByteArray# a1 _a2 && o1 + l1 == _o2.
-adjacentAppend :: Text -> Text -> Text
-adjacentAppend t1@(TInternal.Text a1 o1 l1) t2@(TInternal.Text _a2 _o2 l2)
+unsafeAdjacentAppend :: Text -> Text -> Text
+unsafeAdjacentAppend t1@(TInternal.Text a1 o1 l1) t2@(TInternal.Text _a2 _o2 l2)
   | T.null t1 = t2
   | T.null t2 = t1
   | otherwise = TInternal.Text a1 o1 (l1+l2)
