@@ -335,16 +335,20 @@ data ParserState c a = ParserState
   }
 
 -- | \(O(m \log m)\). Prepare a parser for input.
-prepareParser :: Parser c a -> ParserState c a
+--
+-- Returns @Nothing@ if parsing has failed regardless of further input.
+-- Otherwise, returns the initial @ParserState@.
+prepareParser :: Parser c a -> Maybe (ParserState c a)
 prepareParser p = toParserState (down p CTop stepStateZero)
 
--- | \(O(m \log m)\). Step a parser by feeding a single element @c@. Returns
--- @Nothing@ if the parse has failed regardless of further input. Otherwise,
--- returns an updated @ParserState@.
+-- | \(O(m \log m)\). Step a parser by feeding a single element @c@.
+--
+-- Returns @Nothing@ if parsing has failed regardless of further input.
+-- Otherwise, returns an updated @ParserState@.
 stepParser :: ParserState c a -> c -> Maybe (ParserState c a)
 stepParser ps c = case psNeed ps of
   NeedCNil -> Nothing
-  needs -> Just $! toParserState (go needs)
+  needs -> toParserState (go needs)
   where
     go (NeedCCons t ct rest) =
       let !pt = go rest
@@ -356,18 +360,19 @@ stepParser ps c = case psNeed ps of
 finishParser :: ParserState c a -> Maybe a
 finishParser = psResult
 
-toParserState :: StepState c a -> ParserState c a
-toParserState pt = ParserState
-  { psNeed = sNeed pt
-  , psResult = sResult pt
-  }
+toParserState :: StepState c a -> Maybe (ParserState c a)
+toParserState ss = case (sNeed ss, sResult ss) of
+  (NeedCNil, Nothing) -> Nothing
+  (need, result) -> Just $! ParserState { psNeed = need, psResult = result }
 
 -- | A fold function.
 type Foldr f a = forall b. (a -> b -> b) -> b -> f -> b
 
--- | \(O(mn \log m)\). Run a parser given a sequence @f@ and a fold of @f@.
+-- | \(O(mn \log m)\). Run a parser given a sequence @f@ and a fold function.
+--
+-- Returns early on parse failure, if the fold can short circuit.
 parseFoldr :: Foldr f c -> Parser c a -> f -> Maybe a
-parseFoldr fr = \p xs -> fr f finishParser xs (prepareParser p)
+parseFoldr fr = \p xs -> prepareParser p >>= fr f finishParser xs
   where
     f c k = X.oneShot (\ps -> stepParser ps c >>= k)
 {-# INLINE parseFoldr #-}

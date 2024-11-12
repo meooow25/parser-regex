@@ -7,7 +7,7 @@ import Control.Applicative
 import Control.Monad
 import Data.Char
 import qualified Data.List as L
-import Data.Maybe
+import Data.Maybe (isJust, isNothing)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Proxy
 import Data.Semigroup
@@ -40,6 +40,9 @@ main = defaultMain $ localOption (QuickCheckTests 5000) $ testGroup "Tests"
     [ listReTests
     , listCombinatorTests
     , stringOpTests
+    ]
+  , testGroup "Regex.Base"
+    [ earlyFailureTests
     ]
   , manyTests
   , charSetTests
@@ -1545,6 +1548,66 @@ stringOpTests = testGroup "String operations"
     , testCase "abc xyz abcabc" $ RL.replaceAll ("xyz" <$ RL.list "abc") "abcabc" @?= "xyzxyz"
     , testCase "aba xyz ababababa" $ RL.replaceAll ("xyz" <$ RL.list "aba") "ababababa" @?= "xyzbxyzba"
     , testCase "abc xyz ab" $ RL.replaceAll ("xyz" <$ RL.list "abc") "ab" @?= "ab"
+    ]
+  ]
+
+---------
+-- Base
+---------
+
+earlyFailureTests :: TestTree
+earlyFailureTests = testGroup "Early failure"
+  [ testCase "prepareParser cases" $ do
+      void (R.prepareParser (R.compile empty)) @?= Nothing
+      void (R.prepareParser (R.compile (pure () *> empty))) @?= Nothing
+      void (R.prepareParser (R.compile (empty *> pure ()))) @?= Nothing
+      void (R.prepareParser (R.compile (empty <|> empty))) @?= Nothing
+
+      void (R.prepareParser (R.compile R.anySingle)) @?= Just ()
+      void (R.prepareParser (R.compile (pure ()))) @?= Just ()
+
+  , testGroup "stepParser"
+    [ testCase ". a,aa" $
+        case R.prepareParser (R.compile R.anySingle) of
+          Nothing -> assertFailure "prepare"
+          Just ps0 -> do
+            R.finishParser ps0 @?= Nothing
+            case R.stepParser ps0 'a' of
+              Just ps1 -> do
+                R.finishParser ps1 @?= Just 'a'
+                void (R.stepParser ps1 'b') @?= Nothing
+              _ -> assertFailure "step ps0"
+
+    , testCase "* aa,aaa" $
+        case R.prepareParser (R.compile (many R.anySingle)) of
+          Nothing -> assertFailure "prepare"
+          Just ps0 -> do
+            R.finishParser ps0 @?= Just ""
+            case R.stepParser ps0 'a' of
+              Just ps1 -> do
+                R.finishParser ps1 @?= Just "a"
+                case R.stepParser ps1 'a' of
+                  Just ps2 -> do
+                    R.finishParser ps2 @?= Just "aa"
+                    void (R.stepParser ps2 'a') @?= Just ()
+                  _ -> assertFailure "step ps1"
+              _ -> assertFailure "step ps0"
+
+    , testCase "ab ax,abx" $
+        case R.prepareParser (R.compile (RL.list "ab")) of
+          Nothing -> assertFailure "prepare"
+          Just ps0 -> do
+            R.finishParser ps0 @?= Nothing
+            case R.stepParser ps0 'a' of
+              Just ps1 -> do
+                R.finishParser ps1 @?= Nothing
+                void (R.stepParser ps1 'x') @?= Nothing
+                case R.stepParser ps1 'b' of
+                  Just ps2 -> do
+                    R.finishParser ps2 @?= Just "ab"
+                    void (R.stepParser ps2 'x') @?= Nothing
+                  _ -> assertFailure "step ps1"
+              _ -> assertFailure "step ps0"
     ]
   ]
 
