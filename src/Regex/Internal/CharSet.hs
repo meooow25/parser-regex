@@ -46,18 +46,18 @@ instance Show CharSet where
   showsPrec p cs = showParen (p > 10) $
     showString "fromRanges " . shows (ranges cs)
 
--- | @fromString = 'fromList'@
+-- | @fromString@ = 'fromList'
 instance IsString CharSet where
   fromString = fromList
 
--- | @(<>) = 'union'@
+-- | @(<>)@ = 'union'
 instance Semigroup CharSet where
   (<>) = union
   sconcat = F.foldl' union empty
   {-# INLINE sconcat #-}
   stimes = stimesIdempotentMonoid
 
--- | @mempty = 'empty'@
+-- | @mempty@ = 'empty'
 instance Monoid CharSet where
   mempty = empty
   mconcat = F.foldl' union empty
