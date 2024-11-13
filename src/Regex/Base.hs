@@ -19,6 +19,7 @@ module Regex.Base
   , P.finishParser
   , P.Foldr
   , P.parseFoldr
+  , P.parseNext
 
     -- * @RE@s and combinators
   , R.token
@@ -67,8 +68,8 @@ import qualified Regex.Internal.Parser as P
 -- a large amount of control over the parsing process, making it possible to
 -- parse in a resumable or even branching manner.
 --
--- As a simpler alternative to the trio of functions above, @parseFoldr@ can be
--- used on any sequence type that can be folded over.
+-- @parseFoldr@ and @parseNext@ may be more convenient to use, depending on the
+-- sequence to parse.
 --
 
 -- $strict

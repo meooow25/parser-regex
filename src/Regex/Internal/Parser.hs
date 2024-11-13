@@ -14,6 +14,7 @@ module Regex.Internal.Parser
   , finishParser
   , Foldr
   , parseFoldr
+  , parseNext
   ) where
 
 import Control.Applicative
@@ -371,11 +372,101 @@ type Foldr f a = forall b. (a -> b -> b) -> b -> f -> b
 -- | \(O(mn \log m)\). Run a parser given a sequence @f@ and a fold function.
 --
 -- Returns early on parse failure, if the fold can short circuit.
+--
+-- ==== __Examples__
+--
+-- @
+-- import qualified Data.Vector.Generic as VG -- from vector
+--
+-- import Regex.Base (Parser)
+-- import qualified Regex.Base as R
+--
+-- parseVector :: VG.Vector v c => Parser c a -> v c -> Maybe a
+-- parseVector p v = R.'parseFoldr' VG.foldr p v
+-- @
+--
+-- >>> import Control.Applicative (many)
+-- >>> import qualified Data.Vector as V
+-- >>> import Regex.Base (Parser)
+-- >>> import qualified Regex.Base as R
+-- >>>
+-- >>> let p = R.compile $ many ((,) <$> R.satisfy even <*> R.satisfy odd) :: Parser Int [(Int, Int)]
+-- >>> parseVector p (V.fromList [0..5])
+-- Just [(0,1),(2,3),(4,5)]
+-- >>> parseVector p (V.fromList [0,2..6])
+-- Nothing
+--
 parseFoldr :: Foldr f c -> Parser c a -> f -> Maybe a
 parseFoldr fr = \p xs -> prepareParser p >>= fr f finishParser xs
   where
     f c k = X.oneShot (\ps -> stepParser ps c >>= k)
 {-# INLINE parseFoldr #-}
+
+-- | \(O(mn \log m)\). Run a parser given a \"@next@\" action.
+--
+-- Calls @next@ repeatedly to yield elements. A @Nothing@ is interpreted as
+-- end-of-sequence. May return without exhausting the input on parse failure.
+--
+-- ==== __Examples__
+--
+-- @
+-- import Control.Monad.Trans.State.Strict (StateT(..)) -- from transformers
+-- import qualified Streaming.Prelude as S -- from streaming
+-- import Streaming.Prelude (Stream, Of)
+--
+-- import Regex.Base (Parser)
+-- import qualified Regex.Base as R
+--
+-- parseStream
+--   :: Monad m => Parser c a -> Stream (Of c) m r -> m (Maybe a, Stream (Of c) m r)
+-- parseStream p s = runStateT (R.'parseNext' p next) s
+--   where
+--     next = StateT $ fmap f . S.next
+--     f (Left r) = (Nothing, pure r)
+--     f (Right (c, s')) = (Just c, s')
+-- @
+--
+-- >>> import Control.Applicative (many)
+-- >>> import Data.Foldable (traverse_)
+-- >>> import qualified Streaming.Prelude as S
+-- >>> import Regex.Base (Parser)
+-- >>> import qualified Regex.Base as R
+-- >>>
+-- >>> let p = R.compile $ many ((,) <$> R.satisfy even <*> R.satisfy odd) :: Parser Int [(Int, Int)]
+-- >>> let printEach = S.chain print . S.each
+-- >>> (result, remaining) <- parseStream p (printEach [0..5])
+-- 0
+-- 1
+-- 2
+-- 3
+-- 4
+-- 5
+-- >>> result
+-- Just [(0,1),(2,3),(4,5)]
+-- >>> S.toList remaining
+-- [] :> ()
+-- >>> (result, remaining) <- parseStream p (printEach [0,2..6])
+-- 0
+-- 2
+-- >>> result
+-- Nothing
+-- >>> S.toList remaining
+-- 4
+-- 6
+-- [4,6] :> ()
+--
+-- @since FIXME
+parseNext :: Monad m => Parser c a -> m (Maybe c) -> m (Maybe a)
+parseNext p next = case prepareParser p of
+  Nothing -> pure Nothing
+  Just ps -> loop ps
+  where
+    loop ps = next >>= \m -> case m of
+      Nothing -> pure (finishParser ps)
+      Just c -> case stepParser ps c of
+        Nothing -> pure Nothing
+        Just ps' -> loop ps'
+{-# INLINE parseNext #-}
 
 ---------
 -- Util
