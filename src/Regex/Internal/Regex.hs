@@ -120,13 +120,13 @@ instance Alternative (RE c) where
   some re = liftA2' (:) re (many re)
   many = fmap reverse . foldlMany' (flip (:)) []
 
--- | @(<>) = liftA2 (<>)@
+-- | @(<>)@ = @liftA2 (<>)@
 instance Semigroup a => Semigroup (RE c a) where
   (<>) = liftA2 (<>)
   sconcat = fmap sconcat . sequenceA
   {-# INLINE sconcat #-}
 
--- | @mempty = pure mempty@
+-- | @mempty@ = @pure mempty@
 instance Monoid a => Monoid (RE c a) where
   mempty = pure mempty
   mconcat = fmap mconcat . sequenceA
