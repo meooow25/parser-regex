@@ -410,50 +410,36 @@ parseFoldr fr = \p xs -> prepareParser p >>= fr f finishParser xs
 -- ==== __Examples__
 --
 -- @
--- import Control.Monad.Trans.State.Strict (StateT(..)) -- from transformers
--- import qualified Streaming.Prelude as S -- from streaming
--- import Streaming.Prelude (Stream, Of)
+-- import Conduit (ConduitT, await, sinkNull) -- from conduit
 --
 -- import Regex.Base (Parser)
 -- import qualified Regex.Base as R
 --
--- parseStream
---   :: Monad m => Parser c a -> Stream (Of c) m r -> m (Maybe a, Stream (Of c) m r)
--- parseStream p s = runStateT (R.'parseNext' p next) s
---   where
---     next = StateT $ fmap f . S.next
---     f (Left r) = (Nothing, pure r)
---     f (Right (c, s')) = (Just c, s')
+-- parseConduit :: Monad m => Parser c a -> ConduitT c x m (Maybe a)
+-- parseConduit p = R.'parseNext' p await <* sinkNull
 -- @
 --
 -- >>> import Control.Applicative (many)
--- >>> import Data.Foldable (traverse_)
--- >>> import qualified Streaming.Prelude as S
+-- >>> import Conduit ((.|), iterMC, runConduit, yieldMany)
 -- >>> import Regex.Base (Parser)
 -- >>> import qualified Regex.Base as R
 -- >>>
 -- >>> let p = R.compile $ many ((,) <$> R.satisfy even <*> R.satisfy odd) :: Parser Int [(Int, Int)]
--- >>> let printEach = S.chain print . S.each
--- >>> (result, remaining) <- parseStream p (printEach [0..5])
+-- >>> let printYieldMany xs = yieldMany xs .| iterMC print
+-- >>> runConduit $ printYieldMany [0..5] .| parseConduit p
 -- 0
 -- 1
 -- 2
 -- 3
 -- 4
 -- 5
--- >>> result
 -- Just [(0,1),(2,3),(4,5)]
--- >>> S.toList remaining
--- [] :> ()
--- >>> (result, remaining) <- parseStream p (printEach [0,2..6])
+-- >>> runConduit $ printYieldMany [0,2..6] .| parseConduit p
 -- 0
 -- 2
--- >>> result
--- Nothing
--- >>> S.toList remaining
 -- 4
 -- 6
--- [4,6] :> ()
+-- Nothing
 --
 -- @since FIXME
 parseNext :: Monad m => Parser c a -> m (Maybe c) -> m (Maybe a)
