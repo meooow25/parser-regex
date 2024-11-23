@@ -428,7 +428,7 @@ toReplace re = liftA2 f manyListMin re <*> manyList
 --
 -- @
 -- sep = 'oneOfChar' "-./"
--- digits n = 'replicateM' n (oneOfChar 'Data.CharSet.digit')
+-- digits n = 'Control.Monad.replicateM' n (oneOfChar 'Data.CharSet.digit')
 -- toYmd d m y = concat [y, \"-\", m, \"-\", d]
 -- date = toYmd \<$> digits 2 \<* sep
 --              \<*> digits 2 \<* sep

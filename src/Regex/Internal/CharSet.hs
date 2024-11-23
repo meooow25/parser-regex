@@ -1,7 +1,17 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
+{-# OPTIONS_HADDOCK not-home #-}
+
+-- | This is an internal module. You probably don't need to import this. Import
+-- "Data.CharSet" instead.
+--
+-- = WARNING
+--
+-- Definitions in this module allow violating invariants that would otherwise be
+-- guaranteed by non-internal modules. Use at your own risk!
+--
 module Regex.Internal.CharSet
-  ( CharSet
+  ( CharSet(..)
   , empty
   , singleton
   , fromRange

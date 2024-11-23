@@ -1,3 +1,12 @@
+{-# OPTIONS_HADDOCK not-home #-}
+
+-- | This is an internal module. You probably don't need to import this.
+--
+-- = WARNING
+--
+-- Definitions in this module allow violating invariants that would otherwise be
+-- guaranteed by non-internal modules. Use at your own risk!
+--
 module Regex.Internal.Unique
   ( Unique(..)
   , UniqueSet
@@ -12,7 +21,9 @@ import qualified Data.IntSet as IS
 -- | A unique ID. Must be >= 0.
 newtype Unique = Unique { unUnique :: Int }
 
--- | A set of 'Unique's. The bitmask is a set for IDs 0..63 (0..31 if 32-bit).
+-- | A set of 'Unique's.
+
+-- The bitmask is a set for IDs 0..63 on 64-bit and 0..31 on 32-bit.
 -- Set operations on this are very fast and speed up the common case of small
 -- regexes a little bit, at the cost of a little more memory.
 data UniqueSet = UniqueSet {-# UNPACK #-} !Int !IS.IntSet
