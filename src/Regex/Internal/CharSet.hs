@@ -230,7 +230,10 @@ unsafeChr (I# i#) = C# (chr# i#)
 
 -- | Is the internal structure of the set valid?
 valid :: CharSet -> Bool
-valid cs = and (zipWith (<=) ls hs)
-        && all (>1) (zipWith (flip (-)) hs (tail ls))
+valid cs = noneEmpty && noneAdjacent
   where
     (ls,hs) = unzip (fmap (fmap ord) (IM.assocs (unCharSet cs)))
+    noneEmpty = and (zipWith (<=) ls hs)
+    noneAdjacent = case ls of
+      [] -> True
+      _:ls' -> all (>1) (zipWith (-) ls' hs)
