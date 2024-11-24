@@ -380,6 +380,7 @@ type Foldr f a = forall b. (a -> b -> b) -> b -> f -> b
 
 -- | \(O(mn \log m)\). Run a parser given a sequence @f@ and a fold function.
 --
+-- Parses the entire sequence, not just a prefix or an substring.
 -- Returns early on parse failure, if the fold can short circuit.
 --
 -- ==== __Examples__
@@ -414,7 +415,10 @@ parseFoldr fr = \p xs -> prepareParser p >>= fr f finishParser xs
 -- | \(O(mn \log m)\). Run a parser given a \"@next@\" action.
 --
 -- Calls @next@ repeatedly to yield elements. A @Nothing@ is interpreted as
--- end-of-sequence. May return without exhausting the input on parse failure.
+-- end-of-sequence.
+--
+-- Parses the entire sequence, not just a prefix or an substring.
+-- Returns without exhausting the input on parse failure.
 --
 -- ==== __Examples__
 --
