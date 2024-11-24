@@ -26,6 +26,8 @@ benchmark bench
       , text
 
       , parser-regex
+      , pcre-heavy == 1.0.0.3
+      , pcre2 == 2.2.1
       , regex == 1.1.0.2
       , regex-applicative == 0.3.4
       , regex-base
