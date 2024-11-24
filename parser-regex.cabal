@@ -1,6 +1,6 @@
 cabal-version:      2.4
 name:               parser-regex
-version:            0.1.0.0
+version:            0.2.0.0
 synopsis:           Regex based parsers
 description:        Regex based parsers.
 homepage:           https://github.com/meooow25/parser-regex
@@ -19,7 +19,7 @@ tested-with:
     GHC == 9.0.2
   , GHC == 9.2.8
   , GHC == 9.4.8
-  , GHC == 9.6.5
+  , GHC == 9.6.6
   , GHC == 9.8.2
   , GHC == 9.10.1
 
@@ -28,7 +28,8 @@ source-repository head
     location: https://github.com/meooow25/parser-regex.git
 
 common warnings
-    ghc-options: -Wall
+    ghc-options:
+        -Wall -Wcompat -Widentities -Wredundant-constraints -Wunused-packages
 
 library
     import:           warnings
@@ -68,13 +69,12 @@ test-suite test
 
     build-depends:
         base
-      , containers
       , parser-regex
-      , QuickCheck >= 2.14.3 && < 2.15
+      , QuickCheck >= 2.14.3 && < 2.16
       , quickcheck-classes-base >= 0.6.2 && < 0.7
       , tasty >= 1.5 && < 1.6
       , tasty-hunit >= 0.10.1 && < 0.11
-      , tasty-quickcheck >= 0.10.3 && < 0.11
+      , tasty-quickcheck >= 0.10.3 && < 0.12
       , text
 
     hs-source-dirs:   test
