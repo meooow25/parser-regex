@@ -177,7 +177,10 @@ labelToken node t = maybe
     (fromString . escape . disp) (filter (isJust . t) cs))
 
 escape :: String -> String
-escape = init . tail . show
+escape = init . tail' . show
+  where
+    tail' (_:xs) = xs
+    tail' [] = error "tail'"
 
 (<+>) :: Str -> Str -> Str
 s1 <+> s2 = s1 <> " " <> s2
