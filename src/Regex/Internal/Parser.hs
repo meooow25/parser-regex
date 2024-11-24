@@ -454,7 +454,7 @@ parseFoldr fr = \p xs -> prepareParser p >>= fr f finishParser xs
 -- 6
 -- Nothing
 --
--- @since FIXME
+-- @since 0.2.0.0
 parseNext :: Monad m => Parser c a -> m (Maybe c) -> m (Maybe a)
 parseNext p next = case prepareParser p of
   Nothing -> pure Nothing

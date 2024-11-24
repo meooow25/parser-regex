@@ -1,4 +1,4 @@
-### Unreleased
+### 0.2.0.0 -- 2024-11-24
 
 * Breaking changes
   * Parsing fails more eagerly. This affects lazy list parsing and parsing via
