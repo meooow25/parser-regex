@@ -396,6 +396,8 @@ textTokenFoldr f z (TInternal.Text a o0 l) = loop o0
 
 -- | \(O(mn \log m)\). Parse a @Text@ with a @REText@.
 --
+-- Parses the entire @Text@, not just a prefix or a substring.
+--
 -- Uses 'Regex.Text.compile', see the note there.
 --
 -- If parsing multiple @Text@s using the same @RE@, it is wasteful to compile
@@ -410,6 +412,8 @@ reParse re = let !p = P.compile re in parse p
 {-# INLINE reParse #-}
 
 -- | \(O(mn \log m)\). Parse a @Text@ with a @ParserText@.
+--
+-- Parses the entire @Text@, not just a prefix or a substring.
 parse :: ParserText a -> Text -> Maybe a
 parse = P.parseFoldr textTokenFoldr
 
@@ -417,6 +421,8 @@ parse = P.parseFoldr textTokenFoldr
 -- parse failure.
 --
 -- For use with parsers that are known to never fail.
+--
+-- Parses the entire @Text@, not just a prefix or a substring.
 parseSure :: ParserText a -> Text -> a
 parseSure p = fromMaybe parseSureError . parse p
 

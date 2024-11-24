@@ -291,6 +291,9 @@ withMatch = R.fmap' (\(WM cs x) -> (dToL cs, x)) . go
 
 -- | \(O(mn \log m)\). Parse a list with a @RE@.
 --
+-- Parses the entire list, not just a prefix or a substring.
+-- Returns early without demanding the entire list on parse failure.
+--
 -- Uses 'Regex.List.compile', see the note there.
 --
 -- If parsing multiple lists using the same @RE@, it is wasteful to compile
@@ -305,6 +308,9 @@ reParse re = let !p = P.compile re in parse p
 {-# INLINE reParse #-}
 
 -- | \(O(mn \log m)\). Parse a list with a @Parser@.
+--
+-- Parses the entire list, not just a prefix or a substring.
+-- Returns early without demanding the entire list on parse failure.
 parse :: Parser c a -> [c] -> Maybe a
 parse = P.parseFoldr foldr
 {-# INLINE parse #-}
@@ -313,6 +319,9 @@ parse = P.parseFoldr foldr
 -- parse failure.
 --
 -- For use with parsers that are known to never fail.
+--
+-- Parses the entire list, not just a prefix or a substring.
+-- Returns early without demanding the entire list on parse failure.
 parseSure :: Parser c a -> [c] -> a
 parseSure p = fromMaybe parseSureError . parse p
 {-# INLINE parseSure #-}
