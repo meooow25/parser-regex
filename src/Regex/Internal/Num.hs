@@ -133,9 +133,7 @@ mkSignedIntRange minus plus wordRangeDec (low,high) = case (negR, nonNegR) of
 {-# INLINE mkSignedIntRange #-}
 
 absw :: Int -> Word
-absw x = if x == minBound
-         then fromIntegral (abs (x+1) + 1)
-         else fromIntegral (abs x)
+absw = fromIntegral . abs
 
 -------------------
 -- Parsing ranges
