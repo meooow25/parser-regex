@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
@@ -32,10 +33,13 @@ import Control.Monad.Trans.State.Strict
   ( State, StateT, evalState, evalStateT, execState, gets, modify', state)
 import Control.Monad.Fix (mfix)
 import Data.Maybe (isJust)
+import qualified Data.Foldable as F
+import qualified Data.Traversable as T
+#ifdef __GLASGOW_HASKELL__
 import Data.Primitive.SmallArray
   (SmallArray, emptySmallArray, smallArrayFromList)
-import qualified Data.Foldable as F
 import qualified GHC.Exts as X
+#endif
 
 import Regex.Internal.Regex (RE(..), Strictness(..), Greediness(..))
 import Regex.Internal.Unique (Unique(..), UniqueSet)
@@ -98,7 +102,7 @@ compileToParser re = case re of
     let (re1,re2,res) = gatherAlts re01 re02
     p1 <- compileToParser re1
     p2 <- compileToParser re2
-    ps <- traverse compileToParser res
+    ps <- T.traverse compileToParser res
     pure $ PAlt u p1 p2 (smallArrayFromList ps)
   RFold st gr f z re1 -> do
     u <- nxtU
@@ -128,7 +132,7 @@ compileToNode a re0 = go re0 (NAccept a)
             (re1,re2,res) = gatherAlts re01 re02
         n1 <- go re1 nxt1
         n2 <- go re2 nxt1
-        ns <- traverse (flip go nxt1) res
+        ns <- T.traverse (flip go nxt1) res
         pure $ NAlt n1 n2 (smallArrayFromList ns)
       RFold _ gr _ _ re1 -> goMany gr re1 nxt
       RMany _ _ _ _ re1 -> goMany Greedy re1 nxt
@@ -145,10 +149,12 @@ compileToNode a re0 = go re0 (NAccept a)
 gatherAlts :: RE c a -> RE c a -> (RE c a, RE c a, [RE c a])
 gatherAlts re01 re02 = case go re01 (go re02 []) of
   re11:re12:res -> (re11, re12, res)
-  _ -> errorWithoutStackTrace "Regex.Internal.Parser.gatherAlts: impossible"
+  _ -> error "Regex.Internal.Parser.gatherAlts: impossible"
   where
-    go (RAlt re1 re2) = go re1 . go re2
-    go re = (re:)
+    -- TODO: Remove this sig if not necessary
+    go :: RE c1 a1 -> [RE c1 a1] -> [RE c1 a1]
+    go (RAlt re1 re2) acc = go re1 (go re2 acc)
+    go re acc= re:acc
 
 --------------------
 -- Compile bounded
@@ -365,6 +371,8 @@ stepParser ps c0 = case psNeed ps of
   NeedCNil -> Nothing
   needs -> toParserState (go c0 needs)
   where
+    -- TODO: Remove this sig if not necessary
+    go :: c1 -> NeedCList c1 a1 -> StepState c1 a1
     go c (NeedCCons t ct rest) =
       let !pt = go c rest
       in maybe pt (\b -> up b ct pt) (t c)
@@ -414,7 +422,11 @@ type Foldr f a = forall b. (a -> b -> b) -> b -> f -> b
 parseFoldr :: Foldr f c -> Parser c a -> f -> Maybe a
 parseFoldr fr = \p xs -> prepareParser p >>= fr f finishParser xs
   where
-    f c k = X.oneShot (\ !ps -> stepParser ps c >>= k)
+    f c k =
+#ifdef __GLASGOW_HASKELL__
+      X.oneShot
+#endif
+        (\ !ps -> stepParser ps c >>= k)
 {-# INLINE parseFoldr #-}
 
 -- | \(O(mn \log m)\). Run a parser given a \"@next@\" action.
@@ -480,6 +492,20 @@ unlessM :: Monad m => m Bool -> m () -> m ()
 unlessM mb mx = do
   b <- mb
   if b then pure () else mx
+
+-----------------
+-- Array compat
+-----------------
+
+#ifndef __GLASGOW_HASKELL__
+type SmallArray = []
+
+emptySmallArray :: SmallArray a
+emptySmallArray = []
+
+smallArrayFromList :: [a] -> SmallArray a
+smallArrayFromList = id
+#endif
 
 ----------
 -- Notes

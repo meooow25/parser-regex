@@ -17,11 +17,13 @@ module Regex.Internal.Num
 import Control.Applicative ((<|>), empty)
 import qualified Control.Applicative as Ap
 import Control.Monad (replicateM_, void)
-import Data.Primitive.PrimArray
-  (PrimArray(..), newPrimArray, runPrimArray, writePrimArray)
 import Data.Bits ((.&.), countLeadingZeros, unsafeShiftL, unsafeShiftR)
 import Numeric.Natural (Natural)
+#ifdef __GLASGOW_HASKELL__
+import Data.Primitive.PrimArray
+  (PrimArray(..), newPrimArray, runPrimArray, writePrimArray)
 import qualified GHC.Num.Natural as Nat
+#endif
 
 import Regex.Internal.Regex (RE)
 import qualified Regex.Internal.Regex as R
@@ -235,6 +237,7 @@ finishHex
   :: Word          -- ^ Leading digit
   -> NatParseState -- ^ Everything else
   -> Natural
+#ifdef __GLASGOW_HASKELL__
 finishHex !ld (NatParseState acc0 len0 ns0) = case ns0 of
   WNil -> Nat.naturalFromWord (ld `unsafeShiftL` (4*(len0-1)) + acc0)
   WCons n ns1 ->
@@ -268,6 +271,9 @@ finishHex !ld (NatParseState acc0 len0 ns0) = case ns0 of
 -- * Natural invariants:
 --   * If the value fits in a word, it must be NS (via naturalFromWord here).
 --   * Otherwise, use a ByteArray# with NB. The highest Word must not be 0.
+#else
+finishHex = undefined
+#endif
 
 -----------------------------
 -- Parsing decimal Naturals
@@ -412,7 +418,7 @@ pow10 p = case p of
   18 -> 1000000000000000000
   19 -> 10000000000000000000
 #endif
-  _ -> errorWithoutStackTrace "Regex.Internal.Int.pow10: p too large"
+  _ -> error "Regex.Internal.Int.pow10: p too large"
 #else
 #error "unsupported word size"
 #endif
