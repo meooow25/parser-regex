@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_HADDOCK not-home #-}
@@ -50,6 +51,9 @@ import Control.Monad
 import Data.Functor.Classes (Eq1(..), Ord1(..), Show1(..), showsUnaryWith)
 import Data.Semigroup (Semigroup(..))
 import qualified Data.Foldable as F
+#ifdef __MHS__
+import Data.Traversable (sequenceA)
+#endif
 
 ---------------------------------
 -- RE and constructor functions
@@ -95,7 +99,7 @@ data RE c a where
   RPure   :: a -> RE c a
   RLiftA2 :: !Strictness -> !(a1 -> a2 -> a) -> !(RE c a1) -> !(RE c a2) -> RE c a
   REmpty  :: RE c a
-  RAlt    :: !(RE c a) -> !(RE c a) -> (RE c a)
+  RAlt    :: !(RE c a) -> !(RE c a) -> RE c a
   RFold   :: !Strictness -> !Greediness -> !(a -> a1 -> a) -> a -> !(RE c a1) -> RE c a
   RMany   :: !(a1 -> a) -> !(a2 -> a) -> !(a2 -> a1 -> a2) -> !a2 -> !(RE c a1) -> RE c a -- Strict and greedy implicitly
 
@@ -216,7 +220,7 @@ instance Functor Many where
     Repeat x -> Repeat (f x)
     Finite xs -> Finite (map f xs)
 
-instance Foldable Many where
+instance F.Foldable Many where
   foldr f z m = case m of
     Repeat x -> let r = f x r in r
     Finite xs -> foldr f z xs
