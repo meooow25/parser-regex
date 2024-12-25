@@ -409,7 +409,7 @@ type Foldr f a = forall b. (a -> b -> b) -> b -> f -> b
 parseFoldr :: Foldr f c -> Parser c a -> f -> Maybe a
 parseFoldr fr = \p xs -> prepareParser p >>= fr f finishParser xs
   where
-    f c k = X.oneShot (\ps -> stepParser ps c >>= k)
+    f c k = X.oneShot (\ !ps -> stepParser ps c >>= k)
 {-# INLINE parseFoldr #-}
 
 -- | \(O(mn \log m)\). Run a parser given a \"@next@\" action.
@@ -460,7 +460,7 @@ parseNext p next = case prepareParser p of
   Nothing -> pure Nothing
   Just ps -> loop ps
   where
-    loop ps = next >>= \m -> case m of
+    loop !ps = next >>= \m -> case m of
       Nothing -> pure (finishParser ps)
       Just c -> case stepParser ps c of
         Nothing -> pure Nothing
