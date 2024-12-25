@@ -1,3 +1,7 @@
+### 0.2.0.1 -- 2024-12-25
+
+* Documentation improvements
+
 ### 0.2.0.0 -- 2024-11-24
 
 * Breaking changes
