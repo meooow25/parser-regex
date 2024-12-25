@@ -85,7 +85,7 @@ import qualified Data.Foldable as F
 --
 -- Note that, because of bias, it is /not true/ that @a \<|> b = b \<|> a@.
 --
--- /Performance note/: Prefer the smaller of equivalent regexes, i.e. prefer
+-- /Performance tip/: Prefer the smaller of equivalent regexes, i.e. prefer
 -- @(a \<|> b) \<*> c@ over @(a \<*> c) \<|> (b \<*> c)@.
 --
 data RE c a where

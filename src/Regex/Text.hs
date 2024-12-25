@@ -81,7 +81,18 @@ module Regex.Text
   , T.replaceAll
 
     -- * Additional information
-    -- $info
+
+    -- ** Recursive definitions
+    -- $recursive-definitions
+
+    -- ** Laziness
+    -- $laziness
+
+    -- ** Looping parsers
+    -- $looping-parsers
+
+    -- ** Performance
+    -- $performance
   ) where
 
 import qualified Regex.Internal.Regex as R
@@ -104,9 +115,7 @@ import qualified Regex.Internal.Text as T
 -- * "Data.Traversable": @traverse@, @for@, @sequenceA@
 --
 
--- $info
---
--- == Recursive definitions
+-- $recursive-definitions
 --
 -- It is not possible to define a @RE@ recursively. If it were permitted, it
 -- would be capable of parsing more than
@@ -134,16 +143,17 @@ import qualified Regex.Internal.Text as T
 -- you are attempting to parse a non-regular language! You need a more powerful
 -- parser than what this library has to offer.
 --
--- \* [Unlifted datatypes](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/primitives.html#unlifted-datatypes)
--- can serve this purpose but they are too inconvenient to work with.
+-- \*[Unlifted datatypes](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/primitives.html#unlifted-datatypes)
+-- can be used for this but they are too inconvenient to work with.
 --
--- == Laziness
+
+-- $laziness
 --
 -- Parsing is lazy in the result value, i.e. the @a@ in @RE c a@ or
 -- @Parser c a@. In fact, for the algorithm used in this library, this laziness
 -- is essential for good runtime complexity. However, there is little reason
--- to be lazy in other aspects, such as the values of the sequence, @c@, or the
--- functions and regexes used in combinators. Functions are strict in such
+-- to be lazy in other aspects, such as the elements of the sequence, @c@, or
+-- the functions and regexes used in combinators. Functions are strict in such
 -- arguments.
 --
 -- @
@@ -157,7 +167,8 @@ import qualified Regex.Internal.Text as T
 -- liftA2 f r ⊥ = ⊥
 -- @
 --
--- == Looping parsers
+
+-- $looping-parsers
 --
 -- What should be the result of @reParse (many (pure ())) ""@?
 --
@@ -168,7 +179,7 @@ import qualified Regex.Internal.Text as T
 -- can succeed without consuming input, such as @many x@, @manyMin x@, etc.
 --
 -- This library considers that such an outcome is not desirable in practice. It
--- would be surprising to get an infinite structure from your parser. So, in the
+-- would be surprising to get an infinite structure from a parser. So, in the
 -- case that @many@ succeeds an infinite number of times, this library treats it
 -- as succeeding /zero/ times.
 --
@@ -181,25 +192,28 @@ import qualified Regex.Internal.Text as T
 -- indicates if parsing succeeded without consuming input into an infinite list,
 -- or if it succeeded a finite number of times.
 --
--- == Performance
+
+-- $performance
 --
--- This section may be useful for someone looking to understand the performance
--- of this library without diving into the source code.
+-- This section describes some performance characteristics of this library,
+-- without requiring a dive into the source code.
 --
 -- Parsing with a @RE@ is done in two distinct steps.
 --
--- 1. A @RE@ is compiled to a @Parser@ in \(O(m)\) time, where \(m\) is the size
--- of the @RE@. This is a
+-- 1. A @RE@ is compiled to a @Parser@, which is a
 -- [nondeterministic finite automaton](https://en.wikipedia.org/wiki/Nondeterministic_finite_automaton)
--- (NFA).
+-- (NFA), in \(O(m)\) time. \(m\) here is the size of the @RE@, which is the
+-- number of nodes in its internal tree representation. The resulting @Parser@
+-- has \(O(m)\) size.
 -- 2. The @Parser@ is run on a @Text@ in \(O(mn \log m)\) time, where \(n\) is
--- the length of the @Text@. Assumes every @Char@ is parsed in \(O(1)\).
+-- the length of the @Text@. This assumes that each @(TextToken -> Maybe a)@
+-- function used to parse individual elements takes \(O(1)\) time.
 --
--- /Performance note/: Use @(\<$)@ over @(\<$>)@, and @(\<*)@\/@(*>)@ over
+-- /Performance tip/: Use @(\<$)@ over @(\<$>)@, and @(\<*)@\/@(*>)@ over
 -- @liftA2@\/@(\<*>)@ when ignoring the result of a @RE@. Knowing the result is
 -- ignored allows compiling to a faster parser.
 --
--- Memory usage for parsing is \(O(nm)\).
+-- Memory usage for parsing is \(O(nm)\), but
 --
 -- * If the result of a @RE@ is ignored using @(\<$)@, @(\<*)@, or @(*>)@, only
 --   \(O(m)\) memory is required.
