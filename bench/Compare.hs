@@ -18,10 +18,9 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TEnc
 import GHC.Generics (Generic)
-import System.Mem (performMinorGC)
 
 import Test.Tasty (testGroup)
-import Test.Tasty.Bench hiding (nf)
+import Test.Tasty.Bench
 import Test.Tasty.HUnit (testCase, (@?=))
 
 -- parser-regex
@@ -142,7 +141,7 @@ benches = bgroup "compare"
     , bench "regex-tdfa T" $ nf uriTDFA t
     , bench "regex-pcre-builtin BS" $ nf uriPCRE b
     , bench "pcre-heavy T" $ nf uriPCREHeavy t
-    -- , bench "pcre2 T" $ nf uriPcre2 t
+    , bench "pcre2 T" $ nf uriPcre2 t
     , testGroup "tests"
       [ testCase "check count" $ length (uriPR t) @?= 4277
       , testCase "S == T" $ map uriS2T (uriPRS s) @?= uriPR t
@@ -151,12 +150,10 @@ benches = bgroup "compare"
       , testCase "regex-pcre-builtin ==" $ uriPCRE b @?= map uriT2BS (uriPR t)
 
         -- Only check length. Comparing results fails because we cannot
-        -- distinguish between optional no capture and empty capture using
-        -- pcre-heavy.
+        -- distinguish between optional no capture and empty capture for
+        -- pcre-heavy and pcre2.
       , testCase "pcre-heavy ==" $ length (uriPCREHeavy t) @?= 4277
-
-        -- Exception: pcre2: UTF-8 error: isolated byte with 0x80 bit set
-      -- , testCase "pcre2 ==" $ uriPcre2 t @?= uriPR t
+      , testCase "pcre2 ==" $ length (uriPcre2 t) @?= 4277
       ]
     ]
   , bgroup "Exponential backtracking"
@@ -178,11 +175,6 @@ benches = bgroup "compare"
       ]
     ]
   ]
-
--- Need to perform GC to get correct memory stats
--- See https://github.com/Bodigrim/tasty-bench/issues/62
-nf :: NFData b => (a -> b) -> a -> Benchmarkable
-nf f = whnfAppIO $ \x -> case rnf (f x) of () -> performMinorGC
 
 -------------------
 -- English text 1
