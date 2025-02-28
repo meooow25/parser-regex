@@ -17,7 +17,7 @@ A comparison of some Haskell regex libraries:
 | Extensions | No | No | No | Yes<sup>[2]</sup> | Yes<sup>[2]</sup> | Yes<sup>[2]</sup> |
 | Text matching speed<br/>(`English text 1,2`) | Baseline | Very slow | Fast | Very fast | Very fast | Slow |
 | Text replace speed<br/>(`English replace all`) | Baseline | Slow | Slow<sup>[3]</sup> | Comparable<sup>[4]</sup> | Very fast | Fast |
-| Parsing speed<br/>(`CaseFolding.txt`,`URI`) | Baseline | Slow | Comparable | Very fast | Very fast | ⚠ UTF-8 error |
+| Parsing speed<br/>(`CaseFolding.txt`,`URI`) | Baseline | Slow | Comparable | Very fast | Very fast | Very slow |
 | Regex compilation complexity | $O(m)$ | $O(m^2)$ judging by source code | Unclear | Unclear | Unclear | Unclear |
 | Parsing complexity | $O(mn \log m)$ | $O(m^2 n \log m)$ judging by source code | $O(n)$ claimed<sup>[4]</sup> | $O(2^n)$ seen experimentally | $O(2^n)$ seen experimentally | $O(2^n)$ seen experimentally |
 
@@ -31,7 +31,7 @@ A comparison of some Haskell regex libraries:
    library, which claims $O(m^2 n)$ time. This may be true of `regex-tdfa` also.
 
 Classifications (time): <0.25x = Very fast, >0.25x and <0.5x = Fast, >0.5x
-and <2x = Comparable, >2x and <4x = Slow, time >4x = Very slow
+and <2x = Comparable, >2x and <4x = Slow, >4x = Very slow
 
 ## Benchmarks
 
@@ -54,7 +54,7 @@ The suffixes indicate the sequence used for the benchmarks, `T` for `Text`,
 │ regex-tdfa T          │ 38.2 ms │ 111 MB │  11 KB │  27 MB │
 │ regex-pcre-builtin BS │ 13.4 ms │ 708 KB │ 598 B  │  27 MB │
 │ pcre-heavy T          │ 13.5 ms │ 1.3 MB │ 620 B  │  27 MB │
-│ pcre2 T               │ 228  ms │ 1.9 MB │ 2.5 KB │  27 MB │
+│ pcre2 T               │ 183  ms │ 2.0 MB │ 1.9 KB │  27 MB │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -71,7 +71,7 @@ The suffixes indicate the sequence used for the benchmarks, `T` for `Text`,
 │ regex-tdfa T          │ 26.4 ms │ 113 MB │  12 KB │  28 MB │
 │ regex-pcre-builtin BS │ 378  μs │ 277 KB │ 104 B  │  27 MB │
 │ pcre-heavy T          │ 418  μs │ 788 KB │ 102 B  │  27 MB │
-│ pcre2 T               │ 96.4 ms │ 1.0 MB │ 2.4 KB │  27 MB │
+│ pcre2 T               │ 78.7 ms │ 1.1 MB │ 2.1 KB │  27 MB │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -87,7 +87,7 @@ The suffixes indicate the sequence used for the benchmarks, `T` for `Text`,
 │ regex-tdfa T          │ 187  ms │ 696 MB │  26 MB │ 758 MB │
 │ regex-pcre-builtin BS │ 125  ms │ 586 MB │  44 MB │ 490 MB │
 │ pcre-heavy T          │ 22.7 ms │ 378 MB │  13 KB │  28 MB │
-│ pcre2 T               │ 36.0 ms │ 1.6 MB │ 2.1 KB │  27 MB │
+│ pcre2 T               │ 38.7 ms │ 1.7 MB │ 1.9 KB │  27 MB │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -103,7 +103,7 @@ The suffixes indicate the sequence used for the benchmarks, `T` for `Text`,
 │ regex-tdfa T          │ 40.6 ms │ 108 MB │  83 KB │  11 MB │
 │ regex-pcre-builtin BS │ 12.1 ms │ 4.3 MB │  63 KB │  10 MB │
 │ pcre-heavy T          │ 12.4 ms │ 5.2 MB │ 1.2 KB │  10 MB │
-│ pcre2 T               │ 115  ms │ 9.7 MB │ 6.0 KB │  10 MB │
+│ pcre2 T               │ 53.9 ms │  10 MB │ 7.1 KB │  10 MB │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -119,6 +119,7 @@ The suffixes indicate the sequence used for the benchmarks, `T` for `Text`,
 │ regex-tdfa T          │ 193  ms │ 246 MB │ 100 KB │  31 MB │
 │ regex-pcre-builtin BS │ 6.52 ms │  12 MB │ 7.3 MB │  46 MB │
 │ pcre-heavy T          │ 3.84 ms │  15 MB │ 385 KB │  59 MB │
+│ pcre2 T               │ 806  ms │  21 MB │ 7.2 KB │  32 MB │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -134,6 +135,6 @@ The suffixes indicate the sequence used for the benchmarks, `T` for `Text`,
 │ regex-tdfa T          │ 2.37 μs │ 3.6 KB │  88 B  │ 8.0 MB │
 │ regex-pcre-builtin BS │ 161  ms │ 563 KB │ 7.6 KB │ 6.0 MB │
 │ pcre-heavy T          │ 160  ms │ 562 KB │  51 KB │ 6.0 MB │
-│ pcre2 T               │ 257  ms │ 114 KB │  49 KB │ 6.0 MB │
+│ pcre2 T               │ 259  ms │ 567 KB │  14 KB │ 6.0 MB │
 └────────────────────────────────────────────────────────────┘
 ```
