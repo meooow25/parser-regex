@@ -47,10 +47,12 @@ library
         Data.CharSet
         Regex.Base
         Regex.List
+        Regex.Text
         Regex.Internal.CharSet
         Regex.Internal.Debug
         Regex.Internal.Parser
         Regex.Internal.Regex
+        Regex.Internal.Text
         Regex.Internal.Unique
 
     other-modules:
@@ -63,6 +65,7 @@ library
         base >= 4.15 && < 5.0
       , containers >= 0.6.4 && < 0.9
       , deepseq >= 1.4.5 && < 1.6
+      , text >= 2.0.1 && < 2.2
       , transformers >= 0.5.6 && < 0.7
 
     hs-source-dirs:   src
@@ -76,14 +79,9 @@ library
         ScopedTypeVariables
 
     if impl(ghc)
-        exposed-modules:
-            Regex.Text
-            Regex.Internal.Text
-
         build-depends:
             ghc-bignum >= 1.1 && < 1.4
           , primitive >= 0.7.3 && < 0.10
-          , text >= 2.0.1 && < 2.2
 
 test-suite test
     import:           warnings
