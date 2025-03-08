@@ -222,10 +222,14 @@ mkWordRangeBase base quotRemPowBase powBase baseLen d low high
 -- Parsing hexadecimal is simple, there is no base conversion involved.
 --
 -- Step 1: Accumulate the hex digits, packed into Words
--- Step 2: Initialize a ByteArray and fill it with the Words
---
--- Because we create a Nat directly, this makes us depend on ghc-bignum and
--- GHC>=9.0.
+-- Step 2:
+--   * GHC: Initialize a ByteArray and fill it with the Words. This takes
+--     O(n) time. Because we create a Nat directly, this makes us depend on
+--     ghc-bignum and GHC>=9.0.
+--   * Else: Do it like decimal, without assuming anything about the
+--     representation of Naturals. But replace the base multiplications with
+--     shifts, then if it is a binary representation it takes O(n log n) time
+--     instead of O(n^2).
 
 stepHex :: NatParseState -> Word -> NatParseState
 stepHex (NatParseState acc len ns) d
@@ -271,7 +275,39 @@ finishHex !ld (NatParseState acc0 len0 ns0) = case ns0 of
 --   * If the value fits in a word, it must be NS (via naturalFromWord here).
 --   * Otherwise, use a ByteArray# with NB. The highest Word must not be 0.
 #else
-finishHex = undefined
+finishHex !ld (NatParseState acc0 len0 ns0) = combine acc0 len0 ns0
+  where
+    combine !acc !len ns = case ns of
+      WNil -> mul16Pow (w2n ld) (len-1) + w2n acc
+      WCons n ns1 -> mul16Pow (combine1 numWordHexDigs (go n ns1)) len + w2n acc
+      where
+        go n WNil = let !n' = mul16Pow (w2n ld) (numWordHexDigs - 1) + w2n n in [n']
+        go n (WCons m WNil) =
+          let !n' = mul16Pow (w2n ld) (2 * numWordHexDigs - 1) +
+                    mul16Pow (w2n m) numWordHexDigs +
+                    w2n n
+          in [n']
+        go n (WCons m (WCons n1 ns1)) =
+          let !n' = mul16Pow (w2n m) numWordHexDigs + w2n n in n' : go n1 ns1
+
+    combine1 _ [n] = n
+    combine1 numDigs ns1 = combine1 numDigs1 (go ns1)
+      where
+        !numDigs1 = 2 * numDigs
+        go (n:m:ns) = let !n' = mul16Pow m numDigs1 + n in n' : go ns
+        go ns = ns
+
+    mul16Pow :: Natural -> Int -> Natural
+    mul16Pow x p = unsafeShiftL x (4 * p)
+
+    numWordHexDigs :: Int
+    numWordHexDigs = finiteBitSize (0 :: Word) `div` 4
+#endif
+
+-- TODO: Add Bits Natural
+#ifndef __GLASGOW_HASKELL__
+instance Bits Natural where
+  unsafeShiftL x sh = fromIntegral (unsafeShiftL (fromIntegral x :: Integer) sh)
 #endif
 
 -----------------------------
@@ -287,9 +323,10 @@ finishHex = undefined
 --
 -- The obvious foldl approach is O(n^2) for n digits. The combine approach
 -- performs O(n/2^i) multiplications of size O(2^i), for i in [0..log_2(n)].
--- If multiplication is O(n^k), this is also O(n^k). We have k < 2,
--- thanks to subquadratic multiplication of GMP-backed Naturals:
--- https://gmplib.org/manual/Multiplication-Algorithms.
+-- If multiplication is O(n^k), this is also O(n^k).
+--
+-- On GHC, we have k < 2, thanks to subquadratic multiplication of GMP-backed
+-- Naturals: https://gmplib.org/manual/Multiplication-Algorithms.
 --
 -- For reference, here's how GMP converts any base (including 10) to a natural
 -- using broadly the same approach.
