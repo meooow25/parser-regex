@@ -307,12 +307,6 @@ finishHex !ld (NatParseState acc0 len0 ns0) = combine acc0 len0 ns0
     mul16Pow x p = unsafeShiftL x (4 * p)
 #endif
 
--- TODO: Add Bits Natural
-#ifndef __GLASGOW_HASKELL__
-instance Bits Natural where
-  unsafeShiftL x sh = fromIntegral (unsafeShiftL (fromIntegral x :: Integer) sh)
-#endif
-
 -----------------------------
 -- Parsing decimal Naturals
 -----------------------------

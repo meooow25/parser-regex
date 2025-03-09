@@ -151,10 +151,8 @@ gatherAlts re01 re02 = case go re01 (go re02 []) of
   re11:re12:res -> (re11, re12, res)
   _ -> error "Regex.Internal.Parser.gatherAlts: impossible"
   where
-    -- TODO: Remove this sig if not necessary
-    go :: RE c1 a1 -> [RE c1 a1] -> [RE c1 a1]
     go (RAlt re1 re2) acc = go re1 (go re2 acc)
-    go re acc= re:acc
+    go re acc = re:acc
 
 --------------------
 -- Compile bounded
@@ -371,8 +369,6 @@ stepParser ps c0 = case psNeed ps of
   NeedCNil -> Nothing
   needs -> toParserState (go c0 needs)
   where
-    -- TODO: Remove this sig if not necessary
-    go :: c1 -> NeedCList c1 a1 -> StepState c1 a1
     go c (NeedCCons t ct rest) =
       let !pt = go c rest
       in maybe pt (\b -> up b ct pt) (t c)

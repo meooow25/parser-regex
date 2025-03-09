@@ -154,11 +154,6 @@ anyChar = token Just
 oneOf :: CharSet -> REText Char
 oneOf !cs = satisfy (`CS.member` cs)
 
--- TODO: Add Data.Text.foldr
-#ifndef __GLASGOW_HASKELL__
-textFoldr f z = foldr f z . T.unpack
-#endif
-
 -- | Parse the given @Text@.
 text :: Text -> REText Text
 text t =
@@ -166,7 +161,7 @@ text t =
 #ifdef __GLASGOW_HASKELL__
     T.foldr'
 #else
-    textFoldr
+    T.foldr
 #endif
       (\c z -> char c *> z) (pure ()) t
 
@@ -182,7 +177,7 @@ textIgnoreCase t =
            (pure T.empty)
            t
 #else
-  T.pack <$> textFoldr f (pure []) t
+  T.pack <$> T.foldr f (pure []) t
   where
     f c z = Ap.liftA2 (:) (satisfy (\c'' -> CF.caseFoldSimple c'' == c')) z
       where
@@ -481,7 +476,7 @@ textTokenFoldr f z (TInternal.Text a o0 l) = loop o0
       TUnsafe.Iter c clen -> f (TextToken a o c) (loop (o + clen))
 {-# INLINE textTokenFoldr #-}
 #else
-textTokenFoldr f = textFoldr (f . TextToken)
+textTokenFoldr f = T.foldr (f . TextToken)
 #endif
 
 -- | \(O(mn \log m)\). Parse a @Text@ with a @REText@.
@@ -610,19 +605,13 @@ replace :: REText Text -> Text -> Maybe Text
 replace = reParse . toReplace
 {-# INLINE replace #-}
 
--- TODO: Add Data.Text.concat
-#ifndef __GLASGOW_HASKELL__
-textConcat :: [Text] -> Text
-textConcat = T.pack . concatMap T.unpack
-#endif
-
 toReplace :: REText Text -> REText Text
 toReplace re = Ap.liftA2 f manyTextMin re <*> manyText
   where
 #ifdef __GLASGOW_HASKELL__
     f a b c = reverseConcat [c,b,a]
 #else
-    f a b c = textConcat [a,b,c]
+    f a b c = T.concat [a,b,c]
 #endif
 
 -- | \(O(mn \log m)\). Replace all non-overlapping matches of the given @RE@
@@ -658,7 +647,7 @@ toReplaceMany re =
 #ifdef __GLASGOW_HASKELL__
   reverseConcat <$> R.foldlMany' (flip (:)) [] (re <|> anyTokenMatch)
 #else
-  textConcat <$> many (re <|> T.singleton <$> anyChar)
+  T.concat <$> many (re <|> T.singleton <$> anyChar)
 #endif
 
 #ifdef __GLASGOW_HASKELL__
