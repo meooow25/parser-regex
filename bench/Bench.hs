@@ -2,14 +2,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Bench (benches) where
 
-import Control.Applicative
+import Control.Applicative (many)
+import qualified Control.Applicative as Ap
 import Control.DeepSeq (NFData(..))
-import Control.Monad
+import Control.Monad (replicateM)
 import Control.Monad.Random.Strict
+  (Rand, StdGen, evalRand, getRandom, getRandomR, mkStdGen)
 import qualified Data.Foldable as F
 import Data.Text (Text)
 import qualified Data.Text as T
-import Numeric
+import Numeric (showHex)
 
 import Test.Tasty.Bench
 
@@ -149,11 +151,11 @@ aText1000 = T.replicate 1000 "a"
 
 bigNumberDec :: Text
 bigNumberDec = T.pack $ evalR $
-  liftA2 (:) (getRandomR ('1','9')) (replicateM 1000000 (getRandomR ('0','9')))
+  Ap.liftA2 (:) (getRandomR ('1','9')) (replicateM 1000000 (getRandomR ('0','9')))
 
 bigNumberHex :: Text
 bigNumberHex = T.pack $ evalR $
-  liftA2 (:) (d '1') (replicateM 1000000 (d '0'))
+  Ap.liftA2 (:) (d '1') (replicateM 1000000 (d '0'))
   where
     d l = oneof (map getRandomR [(l,'9'), ('a','f'), ('A','F')])
 

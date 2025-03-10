@@ -44,9 +44,10 @@ module Regex.Internal.Regex
   , foldlManyMin'
   ) where
 
-import Control.Applicative
+import Control.Applicative (Alternative(..))
+import qualified Control.Applicative as Ap
 import Control.DeepSeq (NFData(..), NFData1(..), rnf1)
-import Control.Monad
+import Control.Monad (void)
 import Data.Functor.Classes (Eq1(..), Ord1(..), Show1(..), showsUnaryWith)
 import Data.Semigroup (Semigroup(..))
 import qualified Data.Foldable as F
@@ -112,8 +113,8 @@ fmap' = RFmap Strict
 instance Applicative (RE c) where
   pure = RPure
   liftA2 = RLiftA2 NonStrict
-  re1 *> re2 = liftA2 (const id) (void re1) re2
-  re1 <* re2 = liftA2 const re1 (void re2)
+  re1 *> re2 = Ap.liftA2 (const id) (void re1) re2
+  re1 <* re2 = Ap.liftA2 const re1 (void re2)
 
 liftA2' :: (a1 -> a2 -> b) -> RE c a1 -> RE c a2 -> RE c b
 liftA2' = RLiftA2 Strict
@@ -126,7 +127,7 @@ instance Alternative (RE c) where
 
 -- | @(<>)@ = @liftA2 (<>)@
 instance Semigroup a => Semigroup (RE c a) where
-  (<>) = liftA2 (<>)
+  (<>) = Ap.liftA2 (<>)
   sconcat = fmap sconcat . sequenceA
   {-# INLINE sconcat #-}
 
@@ -331,23 +332,23 @@ sepEndBy re sep = sepEndBy1 re sep <|> pure []
 -- | @r \`sepEndBy1\` sep@ parses one or more occurences of @r@, separated and
 -- optionally ended by @sep@. Biased towards matching more.
 sepEndBy1 :: RE c a -> RE c sep -> RE c [a]
-sepEndBy1 re sep = sepBy1 re sep <* optional sep
+sepEndBy1 re sep = sepBy1 re sep <* Ap.optional sep
 
 -- | @chainl1 r op@ parses one or more occurences of @r@, separated by @op@.
 -- The result is obtained by left associative application of all functions
 -- returned by @op@ to the values returned by @p@. Biased towards matching more.
 chainl1 :: RE c a -> RE c (a -> a -> a) -> RE c a
-chainl1 re op = liftA2 (flip id) re rest
+chainl1 re op = Ap.liftA2 (flip id) re rest
   where
-    rest = foldlMany (flip (.)) id (liftA2 flip op re)
+    rest = foldlMany (flip (.)) id (Ap.liftA2 flip op re)
 
 -- | @chainr1 r op@ parses one or more occurences of @r@, separated by @op@.
 -- The result is obtained by right associative application of all functions
 -- returned by @op@ to the values returned by @p@. Biased towards matching more.
 chainr1 :: RE c a -> RE c (a -> a -> a) -> RE c a
-chainr1 re op = liftA2 id rest re
+chainr1 re op = Ap.liftA2 id rest re
   where
-    rest = foldlMany (.) id (liftA2 (flip id) re op)
+    rest = foldlMany (.) id (Ap.liftA2 (flip id) re op)
 
 -- | Results in the first occurence of the given @RE@. Fails if no occurence
 -- is found.

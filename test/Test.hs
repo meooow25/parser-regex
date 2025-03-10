@@ -3,25 +3,27 @@
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- Arbitrary instances
 
-import Control.Applicative
-import Control.Monad
-import Data.Char
+import Control.Applicative (Alternative(..))
+import qualified Control.Applicative as Ap
+import Control.Monad (guard, void)
+import Data.Char (isDigit, isHexDigit)
 import qualified Data.List as L
 import Data.Maybe (isJust, isNothing)
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Proxy
-import Data.Semigroup
-import Data.String
+import Data.Proxy (Proxy(..))
+import Data.Semigroup (Semigroup(..))
+import Data.String (fromString)
 import qualified Numeric as Num
-import Numeric.Natural
+import Numeric.Natural (Natural)
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import Test.Tasty
-import Test.Tasty.HUnit
+import Test.Tasty (TestTree, defaultMain, localOption, testGroup)
+import Test.Tasty.HUnit ((@?=), testCase, assertBool, assertFailure)
 import Test.Tasty.QuickCheck
-import Test.QuickCheck.Classes.Base
-import Test.QuickCheck.Poly
+import Test.QuickCheck.Classes.Base (Laws(..))
+import qualified Test.QuickCheck.Classes.Base as Laws
+import Test.QuickCheck.Poly (A, OrdA)
 
 import qualified Data.CharSet as CS
 import qualified Regex.Base as R
@@ -65,7 +67,7 @@ textReTests = testGroup "Text RE"
   , testGroup "charIgnoreCase" $
     let f c1 c2 = testPM ([c1] <> ", " <> [c2] <> ", ok")
                          (RT.charIgnoreCase c1) (T.singleton c2) (Just c2)
-    in ["aA", "Ǳǲǳ", "θϴϑΘ"] >>= \cs -> liftA2 f cs cs
+    in ["aA", "Ǳǲǳ", "θϴϑΘ"] >>= \cs -> Ap.liftA2 f cs cs
   , testGroup "anyChar"
     [ testProperty "random" $ \c ->
         RT.reParse RT.anyChar (T.singleton c) === Just c
@@ -114,7 +116,7 @@ textReTests = testGroup "Text RE"
     ]
   , testGroup "many some Text bias" $
     let f (name,re1,re2,g) = testProperty name $ \t ->
-          RT.reParse (liftA2 (,) re1 re2) t === g t
+          RT.reParse (Ap.liftA2 (,) re1 re2) t === g t
     in map f
       [ ("manyText manyText", RT.manyText, RT.manyText, \t -> Just (t,""))
       , ("manyText someText", RT.manyText, RT.someText, \t ->
@@ -197,7 +199,7 @@ listReTests = testGroup "List RE"
   , testGroup "charIgnoreCase" $
     let f c1 c2 = testLPM ([c1] <> ", " <> [c2] <> ", ok")
                           (RL.charIgnoreCase c1) [c2] (Just c2)
-    in ["aA", "Ǳǲǳ", "θϴϑΘ"] >>= \cs -> liftA2 f cs cs
+    in ["aA", "Ǳǲǳ", "θϴϑΘ"] >>= \cs -> Ap.liftA2 f cs cs
   , testGroup "anyChar"
     [ testProperty "random" $ \c ->
         RL.reParse @Char RL.anySingle [c] === Just c
@@ -246,7 +248,7 @@ listReTests = testGroup "List RE"
     ]
   , testGroup "many some Text bias" $
     let f (name,re1,re2,g) = testProperty name $ \t ->
-          RL.reParse (liftA2 (,) re1 re2) t === g t
+          RL.reParse (Ap.liftA2 (,) re1 re2) t === g t
     in map f
       [ ("manyList manyList", RL.manyList, RL.manyList, \t -> Just (t,""))
       , ("manyList someList", RL.manyList, RL.someList, \t ->
@@ -357,7 +359,7 @@ textNumericTests = testGroup "Text numeric"
     , testPM "lz, +001, ok" (RT.integerDec (many (RT.char '0'))) "+001" (Just 1)
     , testPM "lz, -001, ok" (RT.integerDec (many (RT.char '0'))) "-001" (Just (-1))
     , testProperty "random" $
-      forAll (liftA2 (<>) (elements ["-","+",""]) abDecText) $ \t ->
+      forAll (Ap.liftA2 (<>) (elements ["-","+",""]) abDecText) $ \t ->
         let ex = parseInteger parseDecNoLz (T.unpack t)
         in classify (isJust ex) "ok" $
           RT.reParse (RT.integerDec (pure ())) t === ex
@@ -399,7 +401,7 @@ textNumericTests = testGroup "Text numeric"
     , testPM "lz, +001, ok" (RT.integerHex (many (RT.char '0'))) "+001" (Just 1)
     , testPM "lz, -001, ok" (RT.integerHex (many (RT.char '0'))) "-001" (Just (-1))
     , testProperty "random" $
-      forAll (liftA2 (<>) (elements ["-","+",""]) pqHexText) $ \t ->
+      forAll (Ap.liftA2 (<>) (elements ["-","+",""]) pqHexText) $ \t ->
         let ex = parseInteger parseHexNoLz (T.unpack t)
         in classify (isJust ex) "ok" $
           RT.reParse (RT.integerHex (pure ())) t === ex
@@ -430,9 +432,9 @@ textNumericTests = testGroup "Text numeric"
              Nothing
     , testGroup "bias"
       [ let re = RT.wordRangeDec (1,999) in
-        testPM "(1,999) 2222 (222,2)" (liftA2 (,) re re) "2222" (Just (222,2))
+        testPM "(1,999) 2222 (222,2)" (Ap.liftA2 (,) re re) "2222" (Just (222,2))
       , let re = RT.wordRangeDec (1,1000) in
-        testPM "(1,1000) 1111, (111,1)" (liftA2 (,) re re) "1111" (Just (111,1))
+        testPM "(1,1000) 1111, (111,1)" (Ap.liftA2 (,) re re) "1111" (Just (111,1))
       ]
     , testProperty "any word" $ \(Large n) ->
         RT.reParse (RT.wordRangeDec (minBound,maxBound)) (T.pack (show n)) ===
@@ -506,7 +508,7 @@ textNumericTests = testGroup "Text numeric"
       , testProperty "large" $ \(Large low) (Large high) (Large n) -> f low high n
       ]
     , testProperty "random" $ \low high ->
-        forAll (liftA2 (<>) (elements ["-","+",""]) abDecText) $ \t ->
+        forAll (Ap.liftA2 (<>) (elements ["-","+",""]) abDecText) $ \t ->
           let ex = do
                 x <- parseInteger parseDecNoLz (T.unpack t)
                 guard $ fromIntegral low <= x && x <= fromIntegral high
@@ -540,9 +542,9 @@ textNumericTests = testGroup "Text numeric"
              Nothing
     , testGroup "bias"
       [ let re = RT.wordRangeHex (0x1,0x999) in
-        testPM "(1,999) 2222 (222,2)" (liftA2 (,) re re) "2222" (Just (0x222,0x2))
+        testPM "(1,999) 2222 (222,2)" (Ap.liftA2 (,) re re) "2222" (Just (0x222,0x2))
       , let re = RT.wordRangeHex (0x1,0x1000) in
-        testPM "(1,1000) 1111, (111,1)" (liftA2 (,) re re) "1111" (Just (0x111,0x1))
+        testPM "(1,1000) 1111, (111,1)" (Ap.liftA2 (,) re re) "1111" (Just (0x111,0x1))
       ]
     , testProperty "any word" $ \(Large n) ->
         RT.reParse (RT.wordRangeHex (minBound,maxBound)) (T.pack (showHex n)) ===
@@ -616,7 +618,7 @@ textNumericTests = testGroup "Text numeric"
       , testProperty "large" $ \(Large low) (Large high) (Large n) -> f low high n
       ]
     , testProperty "random" $ \low high ->
-        forAll (liftA2 (<>) (elements ["-","+",""]) pqHexText) $ \t ->
+        forAll (Ap.liftA2 (<>) (elements ["-","+",""]) pqHexText) $ \t ->
           let ex = do
                 x <- parseInteger parseHexNoLz (T.unpack t)
                 guard $ fromIntegral low <= x && x <= fromIntegral high
@@ -726,7 +728,7 @@ stringNumericTests = testGroup "Text numeric"
     , testLPM "lz, +001, ok" (RL.integerDec (many (RL.single '0'))) "+001" (Just 1)
     , testLPM "lz, -001, ok" (RL.integerDec (many (RL.single '0'))) "-001" (Just (-1))
     , testProperty "random" $
-      forAll (liftA2 (<>) (elements ["-","+",""]) abDecString) $ \t ->
+      forAll (Ap.liftA2 (<>) (elements ["-","+",""]) abDecString) $ \t ->
         let ex = parseInteger parseDecNoLz t
         in classify (isJust ex) "ok" $
           RL.reParse (RL.integerDec (pure ())) t === ex
@@ -768,7 +770,7 @@ stringNumericTests = testGroup "Text numeric"
     , testLPM "lz, +001, ok" (RL.integerHex (many (RL.single '0'))) "+001" (Just 1)
     , testLPM "lz, -001, ok" (RL.integerHex (many (RL.single '0'))) "-001" (Just (-1))
     , testProperty "random" $
-      forAll (liftA2 (<>) (elements ["-","+",""]) pqHexString) $ \t ->
+      forAll (Ap.liftA2 (<>) (elements ["-","+",""]) pqHexString) $ \t ->
         let ex = parseInteger parseHexNoLz t
         in classify (isJust ex) "ok" $
           RL.reParse (RL.integerHex (pure ())) t === ex
@@ -799,9 +801,9 @@ stringNumericTests = testGroup "Text numeric"
              Nothing
     , testGroup "bias"
       [ let re = RL.wordRangeDec (1,999) in
-        testLPM "(1,999) 2222 (222,2)" (liftA2 (,) re re) "2222" (Just (222,2))
+        testLPM "(1,999) 2222 (222,2)" (Ap.liftA2 (,) re re) "2222" (Just (222,2))
       , let re = RL.wordRangeDec (1,1000) in
-        testLPM "(1,1000) 1111, (111,1)" (liftA2 (,) re re) "1111" (Just (111,1))
+        testLPM "(1,1000) 1111, (111,1)" (Ap.liftA2 (,) re re) "1111" (Just (111,1))
       ]
     , testProperty "any word" $ \(Large n) ->
         RL.reParse (RL.wordRangeDec (minBound,maxBound)) (show n) ===
@@ -875,7 +877,7 @@ stringNumericTests = testGroup "Text numeric"
       , testProperty "large" $ \(Large low) (Large high) (Large n) -> f low high n
       ]
     , testProperty "random" $ \low high ->
-        forAll (liftA2 (<>) (elements ["-","+",""]) abDecString) $ \t ->
+        forAll (Ap.liftA2 (<>) (elements ["-","+",""]) abDecString) $ \t ->
           let ex = do
                 x <- parseInteger parseDecNoLz t
                 guard $ fromIntegral low <= x && x <= fromIntegral high
@@ -909,9 +911,9 @@ stringNumericTests = testGroup "Text numeric"
              Nothing
     , testGroup "bias"
       [ let re = RL.wordRangeHex (0x1,0x999) in
-        testLPM "(1,999) 2222 (222,2)" (liftA2 (,) re re) "2222" (Just (0x222,0x2))
+        testLPM "(1,999) 2222 (222,2)" (Ap.liftA2 (,) re re) "2222" (Just (0x222,0x2))
       , let re = RL.wordRangeHex (0x1,0x1000) in
-        testLPM "(1,1000) 1111, (111,1)" (liftA2 (,) re re) "1111" (Just (0x111,0x1))
+        testLPM "(1,1000) 1111, (111,1)" (Ap.liftA2 (,) re re) "1111" (Just (0x111,0x1))
       ]
     , testProperty "any word" $ \(Large n) ->
         RL.reParse (RL.wordRangeHex (minBound,maxBound)) (showHex n) ===
@@ -985,7 +987,7 @@ stringNumericTests = testGroup "Text numeric"
       , testProperty "large" $ \(Large low) (Large high) (Large n) -> f low high n
       ]
     , testProperty "random" $ \low high ->
-        forAll (liftA2 (<>) (elements ["-","+",""]) pqHexString) $ \t ->
+        forAll (Ap.liftA2 (<>) (elements ["-","+",""]) pqHexString) $ \t ->
           let ex = do
                 x <- parseInteger parseHexNoLz t
                 guard $ fromIntegral low <= x && x <= fromIntegral high
@@ -1147,7 +1149,7 @@ combinatorTests = testGroup "Combinators"
     , testPM "pure (), a, fail" (pure ()) "a" Nothing
     ]
   , testGroup "liftA2" $
-    let re = liftA2 (,) (RT.char 'a') (RT.char 'b') in
+    let re = Ap.liftA2 (,) (RT.char 'a') (RT.char 'b') in
     [ testPM "a b, <e>, fail" re "" Nothing
     , testPM "a b, a, fail" re "a" Nothing
     , testPM "a b, b, fail" re "b" Nothing
@@ -1448,7 +1450,7 @@ mixRE =
   (() <$) .
   R.manyr .
   many .
-  (\r -> liftA2 (\_ _ -> ()) r r) .
+  (\r -> Ap.liftA2 (\_ _ -> ()) r r) .
   (\r -> r <|> r) .
   fmap (const ()) $
   R.token (const (Just ()))
@@ -1621,9 +1623,9 @@ earlyFailureTests = testGroup "Early failure"
 
 manyTests :: TestTree
 manyTests = testGroup "Many" $ map testLaws
-  [ eqLaws (Proxy :: Proxy (RT.Many A))
-  , ordLaws (Proxy :: Proxy (RT.Many OrdA))
-  , functorLaws (Proxy :: Proxy RT.Many)
+  [ Laws.eqLaws (Proxy :: Proxy (RT.Many A))
+  , Laws.ordLaws (Proxy :: Proxy (RT.Many OrdA))
+  , Laws.functorLaws (Proxy :: Proxy RT.Many)
   ]
 -- Cannot use foldableLaws because it cannot handle infinite structures.
 
@@ -1635,11 +1637,11 @@ charSetTests :: TestTree
 charSetTests = localOption (QuickCheckTests 1000) $ testGroup "CharSet"
   [ testGroup "Laws" $ map testLaws $
     let p = Proxy :: Proxy CS.CharSet in
-    [ eqLaws p
-    , semigroupLaws p
-    , commutativeSemigroupLaws p
-    , idempotentSemigroupLaws p
-    , monoidLaws p
+    [ Laws.eqLaws p
+    , Laws.semigroupLaws p
+    , Laws.commutativeSemigroupLaws p
+    , Laws.idempotentSemigroupLaws p
+    , Laws.monoidLaws p
     ]
   , testGroup "fromList"
     [ testProperty "valid" $ \s -> validCS (CS.fromList s)

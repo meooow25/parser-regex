@@ -11,11 +11,12 @@ module Regex.Internal.Debug
   , dispCharRanges
   ) where
 
-import Control.Monad
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Identity
+import Control.Monad ((>=>))
+import Control.Monad.Trans.Class (MonadTrans(..))
+import Control.Monad.Trans.Identity (IdentityT(..))
 import Control.Monad.Trans.State.Strict
-import Control.Monad.Trans.Writer.CPS
+  (StateT(..), evalStateT, gets, modify', state)
+import Control.Monad.Trans.Writer.CPS (Writer, execWriter, tell)
 import qualified Data.Foldable as F
 import Data.Maybe (isJust)
 import Data.IntMap.Strict (IntMap)
