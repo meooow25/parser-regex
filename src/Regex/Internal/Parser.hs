@@ -182,10 +182,10 @@ checkSize lim re0 = isJust (evalStateT (go re0) 0)
         RMany _ _ _ _ re1 -> inc *> go re1
         RFold _ _ _ _ re1 -> inc *> go re1
     inc = do
-      n <- get
-      if n == lim
-      then empty
-      else put $! n+1
+      ok <- gets (< lim)
+      if ok
+      then modify' (+1)
+      else empty
 
 ----------
 -- Parse

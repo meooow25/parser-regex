@@ -1434,6 +1434,10 @@ compileTests = testGroup "Compile tests"
       assertBool "isJust" $ isJust (R.compileBounded 15 mixRE)
     , testCase "mixRE 14" $
       assertBool "isNothing" $ isNothing (R.compileBounded 14 mixRE)
+    , testCase "mixRE 0" $
+      assertBool "isNothing" $ isNothing (R.compileBounded 0 mixRE)
+    , testCase "mixRE -1" $
+      assertBool "isNothing" $ isNothing (R.compileBounded (-1) mixRE)
     ]
   ]
 -- the exact size may change in the future, just test that there is _some_
