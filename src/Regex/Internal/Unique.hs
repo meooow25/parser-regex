@@ -15,7 +15,7 @@ module Regex.Internal.Unique
   , insert
   ) where
 
-import Data.Bits
+import Data.Bits ((.|.), (.&.), unsafeShiftL, finiteBitSize)
 import qualified Data.IntSet as IS
 
 -- | A unique ID. Must be >= 0.

@@ -4,6 +4,7 @@
 module Compare (benches) where
 
 import Control.Applicative (Alternative(..), optional)
+import qualified Control.Applicative as Ap
 import Control.DeepSeq (NFData(..))
 import Control.Monad (replicateM_)
 import Data.Char (digitToInt, chr)
@@ -417,7 +418,7 @@ caseFoldingRA = fromJust . RA.match re
   where
     re = toFindManyRA one
     hexCode = chr <$> RA.hexadecimal
-    manyHexCode = liftA2 (:) hexCode (many (RA.sym ' ' *> hexCode))
+    manyHexCode = Ap.liftA2 (:) hexCode (many (RA.sym ' ' *> hexCode))
     one = F.asum
       [ Common <$> hexCode <* RA.string "; C; " <*> hexCode
       , Simple <$> hexCode <* RA.string "; S; " <*> hexCode
@@ -724,11 +725,11 @@ betweenCountRA (l,h) re
   where
     l' = max l 0
     go 0 = pure []
-    go n = liftA2 (:) re (go (n-1)) <|> pure []
+    go n = Ap.liftA2 (:) re (go (n-1)) <|> pure []
 
 -- n0 must be >= 0
 replicateAppendMRA :: Int -> RA.RE c a -> RA.RE c [a] -> RA.RE c [a]
 replicateAppendMRA n0 re re1 = go n0
   where
     go 0 = re1
-    go n = liftA2 (:) re (go (n-1))
+    go n = Ap.liftA2 (:) re (go (n-1))

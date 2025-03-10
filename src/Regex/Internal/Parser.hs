@@ -26,11 +26,14 @@ module Regex.Internal.Parser
   , parseNext
   ) where
 
-import Control.Applicative
+import Control.Applicative ((<|>), empty)
+import qualified Control.Applicative as Ap
 import Control.Monad.Trans.State.Strict
-import Control.Monad.Fix
+  ( State, StateT, evalState, evalStateT, execState, gets, modify', state)
+import Control.Monad.Fix (mfix)
 import Data.Maybe (isJust)
 import Data.Primitive.SmallArray
+  (SmallArray, emptySmallArray, smallArrayFromList)
 import qualified Data.Foldable as F
 import qualified GHC.Exts as X
 
@@ -88,7 +91,7 @@ compileToParser re = case re of
   RFmap_ a re1 -> PFmap_ <$> compileToNode a re1
   RPure a -> pure $ PPure a
   RLiftA2 st f re1 re2 ->
-    liftA2 (PLiftA2 st f) (compileToParser re1) (compileToParser re2)
+    Ap.liftA2 (PLiftA2 st f) (compileToParser re1) (compileToParser re2)
   REmpty -> pure PEmpty
   RAlt re01 re02 -> do
     u <- nxtU

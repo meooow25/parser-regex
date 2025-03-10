@@ -35,8 +35,8 @@ module Regex.Internal.CharSet
 
 import Prelude hiding (not, map)
 import qualified Prelude
-import Data.Char
-import Data.String
+import Data.Char (ord)
+import Data.String (IsString(..))
 import qualified Data.Foldable as F
 import qualified Data.IntMap.Strict as IM
 import Data.Semigroup (Semigroup(..), stimesIdempotentMonoid)

@@ -5,8 +5,8 @@ build-depends: base, containers, parser-regex, text
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
 
-import Control.Applicative
-import Control.Monad
+import Control.Applicative ((<|>), many)
+import Control.Monad (replicateM, when)
 import System.Environment (getArgs)
 import System.Exit (die)
 import Data.Char (chr, ord)

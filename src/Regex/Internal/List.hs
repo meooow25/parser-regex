@@ -40,10 +40,11 @@ module Regex.Internal.List
   , replaceAll
   ) where
 
-import Control.Applicative
-import Data.Char
+import Control.Applicative ((<|>), many, some)
+import qualified Control.Applicative as Ap
+import Data.Char (ord)
 import Data.Maybe (fromMaybe)
-import Numeric.Natural
+import Numeric.Natural (Natural)
 
 import Data.CharSet (CharSet)
 import qualified Data.CharSet as CS
@@ -273,7 +274,7 @@ withMatch = R.fmap' (\(WM cs x) -> (dToL cs, x)) . go
       RLiftA2 st f re1 re2 ->
         let g = case st of
               Strict -> liftA2WM' f
-              NonStrict -> liftA2 f
+              NonStrict -> Ap.liftA2 f
         in RLiftA2 Strict g (go re1) (go re2)
       REmpty -> REmpty
       RAlt re1 re2 -> RAlt (go re1) (go re2)
@@ -282,7 +283,7 @@ withMatch = R.fmap' (\(WM cs x) -> (dToL cs, x)) . go
       RFold st gr f z re1 ->
         let g = case st of
               Strict -> liftA2WM' f
-              NonStrict -> liftA2 f
+              NonStrict -> Ap.liftA2 f
         in RFold Strict gr g (pure z) (go re1)
 
 ----------
@@ -420,7 +421,7 @@ replace = reParse . toReplace
 {-# INLINE replace #-}
 
 toReplace :: RE c [c] -> RE c [c]
-toReplace re = liftA2 f manyListMin re <*> manyList
+toReplace re = Ap.liftA2 f manyListMin re <*> manyList
   where
     f a b c = concat [a,b,c]
 

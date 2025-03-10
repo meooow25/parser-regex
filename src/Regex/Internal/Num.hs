@@ -14,13 +14,14 @@ module Regex.Internal.Num
 
 #include "MachDeps.h"
 
-import Control.Applicative
-import Control.Monad
+import Control.Applicative ((<|>), empty)
+import qualified Control.Applicative as Ap
+import Control.Monad (replicateM_, void)
 import Data.Primitive.PrimArray
-import Data.Bits
-import Numeric.Natural
-
-import GHC.Num.Natural as Nat
+  (PrimArray(..), newPrimArray, runPrimArray, writePrimArray)
+import Data.Bits ((.&.), countLeadingZeros, unsafeShiftL, unsafeShiftR)
+import Numeric.Natural (Natural)
+import qualified GHC.Num.Natural as Nat
 
 import Regex.Internal.Regex (RE)
 import qualified Regex.Internal.Regex as R
@@ -30,7 +31,7 @@ mkNaturalDec
   -> RE c Natural
 mkNaturalDec d =
       0 <$ d 0 0
-  <|> liftA2 finishDec (d 1 9) (R.foldlMany' stepDec state0 (d 0 9))
+  <|> Ap.liftA2 finishDec (d 1 9) (R.foldlMany' stepDec state0 (d 0 9))
   where
     state0 = NatParseState 0 1 WNil
     -- Start with len=1, it's reserved for the leading digit
@@ -41,7 +42,7 @@ mkNaturalHex
   -> RE c Natural
 mkNaturalHex d =
       0 <$ d 0 0
-  <|> liftA2 finishHex (d 1 15) (R.foldlMany' stepHex state0 (d 0 15))
+  <|> Ap.liftA2 finishHex (d 1 15) (R.foldlMany' stepHex state0 (d 0 15))
   where
     state0 = NatParseState 0 1 WNil
     -- Start with len=1, it's reserved for the leading digit

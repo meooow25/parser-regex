@@ -58,11 +58,12 @@ module Regex.Internal.Text
   , replaceAll
   ) where
 
-import Control.Applicative
-import Data.Char
+import Control.Applicative ((<|>))
+import qualified Control.Applicative as Ap
+import Data.Char (ord)
 import qualified Data.Foldable as F
 import Data.Maybe (fromMaybe)
-import Numeric.Natural
+import Numeric.Natural (Natural)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Array as TArray
@@ -370,7 +371,7 @@ withMatch = R.fmap' (\(WM t x) -> (t,x)) . go
       RLiftA2 st f re1 re2 ->
         let g = case st of
               Strict -> liftA2WM' f
-              NonStrict -> liftA2 f
+              NonStrict -> Ap.liftA2 f
         in RLiftA2 Strict g (go re1) (go re2)
       REmpty -> REmpty
       RAlt re1 re2 -> RAlt (go re1) (go re2)
@@ -379,7 +380,7 @@ withMatch = R.fmap' (\(WM t x) -> (t,x)) . go
       RFold st gr f z re1 ->
         let g = case st of
               Strict -> liftA2WM' f
-              NonStrict -> liftA2 f
+              NonStrict -> Ap.liftA2 f
         in RFold Strict gr g (pure z) (go re1)
 
 ----------
@@ -521,7 +522,7 @@ replace = reParse . toReplace
 {-# INLINE replace #-}
 
 toReplace :: REText Text -> REText Text
-toReplace re = liftA2 f manyTextMin re <*> manyText
+toReplace re = Ap.liftA2 f manyTextMin re <*> manyText
   where
     f a b c = reverseConcat [c,b,a]
 
