@@ -27,7 +27,7 @@ jobs:
         with:
           repository: augustss/MicroHs
           # Update ref to a proper version later
-          ref: 97b041151dbaea9bb607a9d3da2eb26fa9d0fe4a
+          ref: cb8bc5d609771014dcc32f3052a59066ee13e3ab
           path: mhs
       - name: make and install mhs
         run: |
@@ -37,7 +37,7 @@ jobs:
         run: |
           PATH="$HOME/.mcabal/bin:$PATH"
           cd source
-          mcabal install
+          mcabal -r install
       - name: cleanup
         run: |
           rm -rf "$HOME/.mcabal"
