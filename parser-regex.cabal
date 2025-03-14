@@ -83,6 +83,11 @@ library
             ghc-bignum >= 1.1 && < 1.4
           , primitive >= 0.7.3 && < 0.10
 
+    if impl(mhs)
+        build-depends:
+            containers >= 0.8
+          , transformers >= 0.6.1.2
+
 test-suite test
     import:           warnings
 
