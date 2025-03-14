@@ -17,11 +17,13 @@ module Regex.Internal.Num
 import Control.Applicative ((<|>), empty)
 import qualified Control.Applicative as Ap
 import Control.Monad (replicateM_, void)
-import Data.Primitive.PrimArray
-  (PrimArray(..), newPrimArray, runPrimArray, writePrimArray)
 import Data.Bits ((.&.), countLeadingZeros, unsafeShiftL, unsafeShiftR)
 import Numeric.Natural (Natural)
+#ifdef __GLASGOW_HASKELL__
+import Data.Primitive.PrimArray
+  (PrimArray(..), newPrimArray, runPrimArray, writePrimArray)
 import qualified GHC.Num.Natural as Nat
+#endif
 
 import Regex.Internal.Regex (RE)
 import qualified Regex.Internal.Regex as R
@@ -221,10 +223,14 @@ mkWordRangeBase base quotRemPowBase powBase baseLen d low high
 -- Parsing hexadecimal is simple, there is no base conversion involved.
 --
 -- Step 1: Accumulate the hex digits, packed into Words
--- Step 2: Initialize a ByteArray and fill it with the Words
---
--- Because we create a Nat directly, this makes us depend on ghc-bignum and
--- GHC>=9.0.
+-- Step 2:
+--   * GHC: Initialize a ByteArray and fill it with the Words. This takes
+--     O(n) time. Because we create a Nat directly, this makes us depend on
+--     ghc-bignum and GHC>=9.0.
+--   * Not GHC: Do it like we do for decimal, without being aware of the
+--     representation of Naturals, but replace the base multiplications with
+--     shifts. If it is a binary representation, this takes O(n log n) time
+--     instead of O(n^2).
 
 stepHex :: NatParseState -> Word -> NatParseState
 stepHex (NatParseState acc len ns) d
@@ -235,6 +241,7 @@ finishHex
   :: Word          -- ^ Leading digit
   -> NatParseState -- ^ Everything else
   -> Natural
+#ifdef __GLASGOW_HASKELL__
 finishHex !ld (NatParseState acc0 len0 ns0) = case ns0 of
   WNil -> Nat.naturalFromWord (ld `unsafeShiftL` (4*(len0-1)) + acc0)
   WCons n ns1 ->
@@ -268,6 +275,37 @@ finishHex !ld (NatParseState acc0 len0 ns0) = case ns0 of
 -- * Natural invariants:
 --   * If the value fits in a word, it must be NS (via naturalFromWord here).
 --   * Otherwise, use a ByteArray# with NB. The highest Word must not be 0.
+#else
+finishHex !ld (NatParseState acc0 len0 ns0) = combine acc0 len0 ns0
+  where
+    combine !acc !len ns = case ns of
+      WNil -> mul16Pow (w2n ld) (len-1) + w2n acc
+      WCons n ns1 ->
+        mul16Pow (combine1 maxBoundWordHexLen (go n ns1)) len + w2n acc
+      where
+        go n WNil =
+          let !n' = mul16Pow (w2n ld) (maxBoundWordHexLen - 1) + w2n n
+          in [n']
+        go n (WCons m WNil) =
+          let !n' = mul16Pow (w2n ld) (2 * maxBoundWordHexLen - 1) +
+                    mul16Pow (w2n m) maxBoundWordHexLen +
+                    w2n n
+          in [n']
+        go n (WCons m (WCons n1 ns1)) =
+          let !n' = mul16Pow (w2n m) maxBoundWordHexLen + w2n n
+          in n' : go n1 ns1
+
+    combine1 :: Int -> [Natural] -> Natural
+    combine1 !_ [n] = n
+    combine1 !numDigs ns1 = combine1 numDigs1 (go ns1)
+      where
+        numDigs1 = 2 * numDigs
+        go (n:m:ns) = let !n' = mul16Pow m numDigs1 + n in n' : go ns
+        go ns = ns
+
+    mul16Pow :: Natural -> Int -> Natural
+    mul16Pow x p = unsafeShiftL x (4 * p)
+#endif
 
 -----------------------------
 -- Parsing decimal Naturals
@@ -282,9 +320,10 @@ finishHex !ld (NatParseState acc0 len0 ns0) = case ns0 of
 --
 -- The obvious foldl approach is O(n^2) for n digits. The combine approach
 -- performs O(n/2^i) multiplications of size O(2^i), for i in [0..log_2(n)].
--- If multiplication is O(n^k), this is also O(n^k). We have k < 2,
--- thanks to subquadratic multiplication of GMP-backed Naturals:
--- https://gmplib.org/manual/Multiplication-Algorithms.
+-- If multiplication is O(n^k), this is also O(n^k).
+--
+-- On GHC, we have k < 2, thanks to subquadratic multiplication of GMP-backed
+-- Naturals: https://gmplib.org/manual/Multiplication-Algorithms.
 --
 -- For reference, here's how GMP converts any base (including 10) to a natural
 -- using broadly the same approach.
@@ -311,6 +350,7 @@ finishDec !ld (NatParseState acc0 len0 ns0) = combine acc0 len0 ns0
         go n (WCons m (WCons n1 ns1)) =
           let !n' = w2n m * safeBaseDec + w2n n in n' : go n1 ns1
 
+    combine1 :: Natural -> [Natural] -> Natural
     combine1 _ [n] = n
     combine1 base ns1 = combine1 base1 (go ns1)
       where
@@ -412,7 +452,7 @@ pow10 p = case p of
   18 -> 1000000000000000000
   19 -> 10000000000000000000
 #endif
-  _ -> errorWithoutStackTrace "Regex.Internal.Int.pow10: p too large"
+  _ -> error "Regex.Internal.Int.pow10: p too large"
 #else
 #error "unsupported word size"
 #endif

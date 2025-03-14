@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -66,10 +67,15 @@ import Data.Maybe (fromMaybe)
 import Numeric.Natural (Natural)
 import Data.Text (Text)
 import qualified Data.Text as T
+#ifdef __GLASGOW_HASKELL__
 import qualified Data.Text.Array as TArray
 import qualified Data.Text.Internal as TInternal
 import qualified Data.Text.Unsafe as TUnsafe
 import qualified Data.Text.Internal.Encoding.Utf8 as TInternalUtf8
+#else
+import Control.Applicative (many, some)
+import qualified Regex.Internal.List as RL
+#endif
 
 import Data.CharSet (CharSet)
 import qualified Data.CharSet as CS
@@ -86,6 +92,7 @@ import qualified Regex.Internal.Generated.CaseFold as CF
 
 -- | The token type used for parsing @Text@.
 
+#ifdef __GLASGOW_HASKELL__
 -- This module uses RE TextToken for Text regexes instead of simply RE Char to
 -- support Text slicing. It does mean that use cases not using slicing pay a
 -- small cost, but it is not worth having two separate Text regex APIs.
@@ -98,6 +105,11 @@ data TextToken = TextToken
   , tOffset  :: {-# UNPACK #-} !Int
   , tChar    :: {-# UNPACK #-} !Char
   }
+#else
+-- No slicing for non-GHC. This means that there is no performance advantage
+-- over Regex.List, but it is still convenient to use when working with Text.
+newtype TextToken = TextToken { tChar :: Char }
+#endif
 
 -- | A type alias for convenience.
 --
@@ -144,7 +156,14 @@ oneOf !cs = satisfy (`CS.member` cs)
 
 -- | Parse the given @Text@.
 text :: Text -> REText Text
-text t = t <$ T.foldr' ((*>) . char) (pure ()) t
+text t =
+  t <$
+#ifdef __GLASGOW_HASKELL__
+    T.foldr'
+#else
+    T.foldr
+#endif
+      (\c z -> char c *> z) (pure ()) t
 
 -- | Parse the given @Text@, ignoring case.
 --
@@ -153,47 +172,94 @@ text t = t <$ T.foldr' ((*>) . char) (pure ()) t
 -- as described by the Unicode standard.
 textIgnoreCase :: Text -> REText Text
 textIgnoreCase t =
+#ifdef __GLASGOW_HASKELL__
   T.foldr' (\c cs -> R.liftA2' unsafeAdjacentAppend (ignoreCaseTokenMatch c) cs)
            (pure T.empty)
            t
+#else
+  T.pack <$> T.foldr f (pure []) t
+  where
+    f c z = Ap.liftA2 (:) (satisfy (\c'' -> CF.caseFoldSimple c'' == c')) z
+      where
+        !c' = CF.caseFoldSimple c
+#endif
 -- See Note [Why simple case fold]
 
 -- | Parse any @Text@. Biased towards matching more.
 manyText :: REText Text
-manyText = R.foldlMany' unsafeAdjacentAppend T.empty anyTokenMatch
+manyText =
+#ifdef __GLASGOW_HASKELL__
+  R.foldlMany' unsafeAdjacentAppend T.empty anyTokenMatch
+#else
+  T.pack <$> many anyChar
+#endif
 
 -- | Parse any non-empty @Text@. Biased towards matching more.
 someText :: REText Text
-someText = R.liftA2' unsafeAdjacentAppend anyTokenMatch manyText
+someText =
+#ifdef __GLASGOW_HASKELL__
+  R.liftA2' unsafeAdjacentAppend anyTokenMatch manyText
+#else
+  T.pack <$> some anyChar
+#endif
 
 -- | Parse any @Text@. Minimal, i.e. biased towards matching less.
 manyTextMin :: REText Text
-manyTextMin = R.foldlManyMin' unsafeAdjacentAppend T.empty anyTokenMatch
+manyTextMin =
+#ifdef __GLASGOW_HASKELL__
+  R.foldlManyMin' unsafeAdjacentAppend T.empty anyTokenMatch
+#else
+  T.pack <$> R.manyMin anyChar
+#endif
 
 -- | Parse any non-empty @Text@. Minimal, i.e. biased towards matching less.
 someTextMin :: REText Text
-someTextMin = R.liftA2' unsafeAdjacentAppend anyTokenMatch manyTextMin
+someTextMin =
+#ifdef __GLASGOW_HASKELL__
+  R.liftA2' unsafeAdjacentAppend anyTokenMatch manyTextMin
+#else
+  T.pack <$> R.someMin anyChar
+#endif
 
 -- | Parse any @Text@ containing members of the @CharSet@.
 -- Biased towards matching more.
 manyTextOf :: CharSet -> REText Text
-manyTextOf !cs = R.foldlMany' unsafeAdjacentAppend T.empty (oneOfTokenMatch cs)
+manyTextOf !cs =
+#ifdef __GLASGOW_HASKELL__
+  R.foldlMany' unsafeAdjacentAppend T.empty (oneOfTokenMatch cs)
+#else
+  T.pack <$> many (satisfy (`CS.member` cs))
+#endif
 
 -- | Parse any non-empty @Text@ containing members of the @CharSet@.
 -- Biased towards matching more.
 someTextOf :: CharSet -> REText Text
-someTextOf !cs = R.liftA2' unsafeAdjacentAppend (oneOfTokenMatch cs) (manyTextOf cs)
+someTextOf !cs =
+#ifdef __GLASGOW_HASKELL__
+  R.liftA2' unsafeAdjacentAppend (oneOfTokenMatch cs) (manyTextOf cs)
+#else
+  T.pack <$> some (satisfy (`CS.member` cs))
+#endif
 
 -- | Parse any @Text@ containing members of the @CharSet@.
 -- Minimal, i.e. biased towards matching less.
 manyTextOfMin :: CharSet -> REText Text
-manyTextOfMin !cs = R.foldlManyMin' unsafeAdjacentAppend T.empty (oneOfTokenMatch cs)
+manyTextOfMin !cs =
+#ifdef __GLASGOW_HASKELL__
+  R.foldlManyMin' unsafeAdjacentAppend T.empty (oneOfTokenMatch cs)
+#else
+  T.pack <$> R.manyMin (satisfy (`CS.member` cs))
+#endif
 
 -- | Parse any non-empty @Text@ containing members of the @CharSet@.
 -- Minimal, i.e. biased towards matching less.
 someTextOfMin :: CharSet -> REText Text
 someTextOfMin !cs =
+#ifdef __GLASGOW_HASKELL__
   R.liftA2' unsafeAdjacentAppend (oneOfTokenMatch cs) (manyTextOfMin cs)
+#else
+  T.pack <$> R.someMin (satisfy (`CS.member` cs))
+#endif
 
 -----------------
 -- Numeric REs
@@ -289,9 +355,10 @@ hexDigitRange !l !h = token $ \c ->
     if l <= d && d <= h then Just d else Nothing
 -- TODO: This can surely be optimized
 
-----------------
--- Match stuff
-----------------
+#ifdef __GLASGOW_HASKELL__
+--------------------
+-- Slicing helpers
+--------------------
 
 tokenToSlice :: TextToken -> Text
 tokenToSlice t =
@@ -319,9 +386,15 @@ oneOfTokenMatch !cs = R.token $ \tok ->
   if CS.member (tChar tok) cs
   then Just $! tokenToSlice tok
   else Nothing
+#endif
+
+----------------
+-- Match stuff
+----------------
 
 -- | Rebuild the @RE@ such that the result is the matched @Text@ instead.
 toMatch :: REText a -> REText Text
+#ifdef __GLASGOW_HASKELL__
 toMatch = go
   where
     go :: REText b -> REText Text
@@ -338,7 +411,13 @@ toMatch = go
         RFold Strict Greedy unsafeAdjacentAppend T.empty (go re1)
       RFold _ gr _ _ re1 ->
         RFold Strict gr unsafeAdjacentAppend T.empty (go re1)
+#else
+toMatch = fmap (T.pack . map tChar) . RL.toMatch
+#endif
 
+-- | Rebuild the @RE@ to include the matched @Text@ alongside the result.
+withMatch :: REText a -> REText (Text, a)
+#ifdef __GLASGOW_HASKELL__
 data WithMatch a = WM {-# UNPACK #-} !Text a
 
 instance Functor WithMatch where
@@ -354,8 +433,6 @@ instance Applicative WithMatch where
 liftA2WM' :: (a1 -> a2 -> b) -> WithMatch a1 -> WithMatch a2 -> WithMatch b
 liftA2WM' f (WM t1 x) (WM t2 y) = WM (unsafeAdjacentAppend t1 t2) $! f x y
 
--- | Rebuild the @RE@ to include the matched @Text@ alongside the result.
-withMatch :: REText a -> REText (Text, a)
 withMatch = R.fmap' (\(WM t x) -> (t,x)) . go
   where
     go :: REText b -> REText (WithMatch b)
@@ -382,18 +459,25 @@ withMatch = R.fmap' (\(WM t x) -> (t,x)) . go
               Strict -> liftA2WM' f
               NonStrict -> Ap.liftA2 f
         in RFold Strict gr g (pure z) (go re1)
+#else
+withMatch = fmap (\(toks, x) -> (T.pack (map tChar toks), x)) . RL.withMatch
+#endif
 
 ----------
 -- Parse
 ----------
 
 textTokenFoldr :: (TextToken -> b -> b) -> b -> Text -> b
+#ifdef __GLASGOW_HASKELL__
 textTokenFoldr f z (TInternal.Text a o0 l) = loop o0
   where
     loop o | o - o0 >= l = z
     loop o = case TUnsafe.iterArray a o of
       TUnsafe.Iter c clen -> f (TextToken a o c) (loop (o + clen))
 {-# INLINE textTokenFoldr #-}
+#else
+textTokenFoldr f = T.foldr (f . TextToken)
+#endif
 
 -- | \(O(mn \log m)\). Parse a @Text@ with a @REText@.
 --
@@ -428,7 +512,7 @@ parseSure :: ParserText a -> Text -> a
 parseSure p = fromMaybe parseSureError . parse p
 
 parseSureError :: a
-parseSureError = errorWithoutStackTrace
+parseSureError = error
   "Regex.Text.parseSure: parse failed; if parsing can fail use 'parse' instead"
 
 reParseSure :: REText a -> Text -> a
@@ -524,7 +608,11 @@ replace = reParse . toReplace
 toReplace :: REText Text -> REText Text
 toReplace re = Ap.liftA2 f manyTextMin re <*> manyText
   where
+#ifdef __GLASGOW_HASKELL__
     f a b c = reverseConcat [c,b,a]
+#else
+    f a b c = T.concat [a,b,c]
+#endif
 
 -- | \(O(mn \log m)\). Replace all non-overlapping matches of the given @RE@
 -- with their results.
@@ -556,8 +644,13 @@ replaceAll = reParseSure . toReplaceMany
 
 toReplaceMany :: REText Text -> REText Text
 toReplaceMany re =
+#ifdef __GLASGOW_HASKELL__
   reverseConcat <$> R.foldlMany' (flip (:)) [] (re <|> anyTokenMatch)
+#else
+  T.concat <$> many (re <|> T.singleton <$> anyChar)
+#endif
 
+#ifdef __GLASGOW_HASKELL__
 -------------------------
 -- Low level Text stuff
 -------------------------
@@ -594,6 +687,7 @@ reverseConcat ts = case ts of
 reverseConcatOverflowError :: a
 reverseConcatOverflowError =
   errorWithoutStackTrace "Regex.Text.reverseConcat: size overflow"
+#endif
 
 ----------
 -- Notes

@@ -1,0 +1,43 @@
+name: MicroHs CI
+
+# Adapted from haskell-ci.yml and
+# https://github.com/haskell/containers/blob/027ea3c6878e53efe70d3dd28fc9070dc0d989b7/.github/workflows/mhs-ci.yml
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  linux:
+    name: MicroHs CI - Linux
+    runs-on: ubuntu-24.04
+    timeout-minutes:
+      60
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          path: source
+      - name: checkout mhs
+        uses: actions/checkout@v4
+        with:
+          repository: augustss/MicroHs
+          # Update ref to a proper version later
+          ref: cb8bc5d609771014dcc32f3052a59066ee13e3ab
+          path: mhs
+      - name: make and install mhs
+        run: |
+          cd mhs
+          make minstall
+      - name: compile and install
+        run: |
+          PATH="$HOME/.mcabal/bin:$PATH"
+          cd source
+          mcabal -r install
+      - name: cleanup
+        run: |
+          rm -rf "$HOME/.mcabal"

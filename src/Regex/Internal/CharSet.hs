@@ -1,5 +1,8 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+#ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE MagicHash #-}
+#endif
 {-# OPTIONS_HADDOCK not-home #-}
 
 -- | This is an internal module. You probably don't need to import this. Import
@@ -40,7 +43,9 @@ import Data.String (IsString(..))
 import qualified Data.Foldable as F
 import qualified Data.IntMap.Strict as IM
 import Data.Semigroup (Semigroup(..), stimesIdempotentMonoid)
+#ifdef __GLASGOW_HASKELL__
 import GHC.Exts (Int(..), Char(..), chr#)
+#endif
 
 -- TODO: Evaluate other set libraries.
 -- Possible candidates: charset, rangeset
@@ -222,7 +227,11 @@ complementRanges = go
     unsafePred c = unsafeChr (ord c - 1)
 
 unsafeChr :: Int -> Char
+#ifdef __GLASGOW_HASKELL__
 unsafeChr (I# i#) = C# (chr# i#)
+#else
+unsafeChr = toEnum
+#endif
 
 ------------
 -- Testing

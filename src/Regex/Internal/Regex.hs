@@ -51,6 +51,7 @@ import Control.Monad (void)
 import Data.Functor.Classes (Eq1(..), Ord1(..), Show1(..), showsUnaryWith)
 import Data.Semigroup (Semigroup(..))
 import qualified Data.Foldable as F
+import qualified Data.Traversable as T
 
 ---------------------------------
 -- RE and constructor functions
@@ -96,7 +97,7 @@ data RE c a where
   RPure   :: a -> RE c a
   RLiftA2 :: !Strictness -> !(a1 -> a2 -> a) -> !(RE c a1) -> !(RE c a2) -> RE c a
   REmpty  :: RE c a
-  RAlt    :: !(RE c a) -> !(RE c a) -> (RE c a)
+  RAlt    :: !(RE c a) -> !(RE c a) -> RE c a
   RFold   :: !Strictness -> !Greediness -> !(a -> a1 -> a) -> a -> !(RE c a1) -> RE c a
   RMany   :: !(a1 -> a) -> !(a2 -> a) -> !(a2 -> a1 -> a2) -> !a2 -> !(RE c a1) -> RE c a -- Strict and greedy implicitly
 
@@ -128,13 +129,13 @@ instance Alternative (RE c) where
 -- | @(<>)@ = @liftA2 (<>)@
 instance Semigroup a => Semigroup (RE c a) where
   (<>) = Ap.liftA2 (<>)
-  sconcat = fmap sconcat . sequenceA
+  sconcat = fmap sconcat . T.sequenceA
   {-# INLINE sconcat #-}
 
 -- | @mempty@ = @pure mempty@
 instance Monoid a => Monoid (RE c a) where
   mempty = pure mempty
-  mconcat = fmap mconcat . sequenceA
+  mconcat = fmap mconcat . T.sequenceA
   {-# INLINE mconcat #-}
 -- Use the underlying type's sconcat/mconcat because it may be more efficient
 -- than the default right-associative definition.
@@ -217,7 +218,7 @@ instance Functor Many where
     Repeat x -> Repeat (f x)
     Finite xs -> Finite (map f xs)
 
-instance Foldable Many where
+instance F.Foldable Many where
   foldr f z m = case m of
     Repeat x -> let r = f x r in r
     Finite xs -> foldr f z xs

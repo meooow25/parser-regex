@@ -328,7 +328,7 @@ parseSure p = fromMaybe parseSureError . parse p
 {-# INLINE parseSure #-}
 
 parseSureError :: a
-parseSureError = errorWithoutStackTrace
+parseSureError = error
   "Regex.List.parseSure: parse failed; if parsing can fail use 'parse' instead"
 
 reParseSure :: RE c a -> [c] -> a
