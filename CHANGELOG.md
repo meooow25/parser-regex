@@ -1,3 +1,9 @@
+### 0.2.0.2 -- 2024-03-15
+
+* Compatibility with [MicroHs](https://github.com/augustss/MicroHs)
+* Performance improvements
+* Fix `compileBounded`'s behavior on negative bounds
+
 ### 0.2.0.1 -- 2024-12-25
 
 * Documentation improvements
