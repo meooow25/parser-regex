@@ -266,17 +266,19 @@ down p !ct !pt = case p of
         modify' $ up x ct
 
 downNode :: Node c b -> Cont c b a -> StepState c a -> StepState c a
-downNode n0 !ct = go n0
-  where
-    go n !pt = case n of
-      NAccept b -> up b ct pt
-      NGuard u n1
-        | U.member u (sSet pt) -> pt
-        | otherwise -> go n1 (pt { sSet = U.insert u (sSet pt) })
-      NToken t nxt ->
-        pt { sNeed = NeedCCons t (CFmap_ nxt ct) (sNeed pt) }
-      NEmpty -> pt
-      NAlt n1 n2 ns -> F.foldl' (flip go) (go n2 (go n1 pt)) ns
+downNode n !ct !pt = case n of
+  NAccept b -> up b ct pt
+  NGuard u n1
+    | U.member u (sSet pt) -> pt
+    | otherwise -> downNode n1 ct (pt { sSet = U.insert u (sSet pt) })
+  NToken t nxt ->
+    pt { sNeed = NeedCCons t (CFmap_ nxt ct) (sNeed pt) }
+  NEmpty -> pt
+  NAlt n1 n2 ns ->
+    F.foldl'
+      (\pt' n' -> downNode n' ct pt')
+      (downNode n2 ct (downNode n1 ct pt))
+      ns
 
 up :: b -> Cont c b a -> StepState c a -> StepState c a
 up b ct !pt = case ct of
@@ -359,14 +361,14 @@ prepareParser p = toParserState (down p CTop stepStateZero)
 -- Returns @Nothing@ if parsing has failed regardless of further input.
 -- Otherwise, returns an updated @ParserState@.
 stepParser :: ParserState c a -> c -> Maybe (ParserState c a)
-stepParser ps c = case psNeed ps of
+stepParser ps c0 = case psNeed ps of
   NeedCNil -> Nothing
-  needs -> toParserState (go needs)
+  needs -> toParserState (go c0 needs)
   where
-    go (NeedCCons t ct rest) =
-      let !pt = go rest
+    go c (NeedCCons t ct rest) =
+      let !pt = go c rest
       in maybe pt (\b -> up b ct pt) (t c)
-    go NeedCNil = stepStateZero
+    go _ NeedCNil = stepStateZero
 {-# INLINE stepParser #-}
 
 -- | \(O(1)\). Get the parse result for the input fed into the parser so far.
