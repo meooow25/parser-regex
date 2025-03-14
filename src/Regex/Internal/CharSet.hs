@@ -105,8 +105,8 @@ insertRange :: (Char, Char) -> CharSet -> CharSet
 insertRange (cl,ch) cs | cl > ch = cs
 insertRange (cl,ch) cs = l `join` fromRange (cl,ch) `join` r
   where
-    (l,mr) = split cl cs
-    (_,r) = split (unsafeChr (ord ch + 1)) mr
+    (l,mr) = split (ord cl) cs
+    (_,r) = split (ord ch + 1) mr
 
 -- | \(O(\min(n,C))\). Delete a @Char@ from a set.
 delete :: Char -> CharSet -> CharSet
@@ -117,8 +117,8 @@ deleteRange :: (Char, Char) -> CharSet -> CharSet
 deleteRange (cl,ch) cs | cl > ch = cs
 deleteRange (cl,ch) cs = l `join` r
   where
-    (l,mr) = split cl cs
-    (_,r) = split (unsafeChr (ord ch + 1)) mr
+    (l,mr) = split (ord cl) cs
+    (_,r) = split (ord ch + 1) mr
 
 -- | \(O(s \min(s,C))\). Map a function over all @Char@s in a set.
 map :: (Char -> Char) -> CharSet -> CharSet
@@ -169,14 +169,14 @@ ranges cs = [(unsafeChr cl, ch) | (cl,ch) <- IM.assocs (unCharSet cs)]
 --------------------
 
 -- | \(O(\min(n,W))\). Split a set into one containing @Char@s smaller than
--- the given @Char@ and one greater than or equal to the given @Char@.
-split :: Char -> CharSet -> (CharSet, CharSet)
-split !c cs = case IM.splitLookup (ord c) (unCharSet cs) of
-  (l, Just ch, r) -> (CharSet l, CharSet $ IM.insert (ord c) ch r)
+-- the given char and one greater than or equal to the given char.
+split :: Int -> CharSet -> (CharSet, CharSet)
+split !c cs = case IM.splitLookup c (unCharSet cs) of
+  (l, Just ch, r) -> (CharSet l, CharSet $ IM.insert c ch r)
   (l, Nothing, r) -> case IM.maxViewWithKey l of
     Just ((lgl,lgh),l1)
-      | lgh >= c -> ( CharSet $ IM.insert lgl (unsafeChr (ord c - 1)) l1
-                    , CharSet $ IM.insert (ord c) lgh r )
+      | ord lgh >= c -> ( CharSet $ IM.insert lgl (unsafeChr (c - 1)) l1
+                        , CharSet $ IM.insert c lgh r )
     _ -> (CharSet l, CharSet r)
 -- The bang on c helps because splitLookup was unfortunately not strict in
 -- the lookup key until https://github.com/haskell/containers/pull/982.
