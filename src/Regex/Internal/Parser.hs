@@ -30,7 +30,7 @@ module Regex.Internal.Parser
 import Control.Applicative ((<|>), empty)
 import qualified Control.Applicative as Ap
 import Control.Monad.Trans.State.Strict
-  ( State, StateT, evalState, evalStateT, execState, gets, modify', state)
+  ( State, StateT, evalState, evalStateT, gets, modify', state)
 import Control.Monad.Fix (mfix)
 import Data.Maybe (isJust)
 import qualified Data.Foldable as F
@@ -222,19 +222,11 @@ data StepState c a = StepState
 stepStateZero :: StepState c a
 stepStateZero = StepState U.empty NeedCNil Nothing
 
--- Note: Ideally we would have
--- down :: Parser c b -> Cont c b a -> State (StepState c a) ()
--- and similar downNode and up, but GHC is unable to optimize it to be
--- equivalent to the current code.
---
--- Using State is pretty convenient though, so it is used in branches. This
--- seems to get optimized well enough.
+sMember :: Unique -> StepState c a -> Bool
+sMember u pt = U.member u (sSet pt)
 
-sMember :: Unique -> State (StepState c a) Bool
-sMember u = gets $ \pt -> U.member u (sSet pt)
-
-sInsert :: Unique -> State (StepState c a) ()
-sInsert u = modify' $ \pt -> pt { sSet = U.insert u (sSet pt) }
+sInsert :: Unique -> StepState c a -> StepState c a
+sInsert u pt = pt { sSet = U.insert u (sSet pt) }
 
 down :: Parser c b -> Cont c b a -> StepState c a -> StepState c a
 down p !ct !pt = case p of
@@ -247,34 +239,40 @@ down p !ct !pt = case p of
   PAlt u p1 p2 ps ->
     let ct1 = CAlt u ct
     in F.foldl' (\pt' p' -> down p' ct1 pt') (down p2 ct1 (down p1 ct1 pt)) ps
-  PFoldGr u st f z p1 -> flip execState pt $
-    unlessM (sMember u) $ do
-      sInsert (localU u)
-      modify' $ down p1 (CFoldGr u st p1 f z ct)
-      unlessM (sMember u) $ do
-        sInsert u
-        modify' $ up z ct
-  PFoldMn u st f z p1 -> flip execState pt $
-    unlessM (sMember u) $ do
-      unlessM (sMember (localU u)) $ do
-        modify' $ up z ct
-      sInsert u
-      modify' $ down p1 (CFoldMn u st p1 f z ct)
-  PMany u f1 f2 f z p1 -> flip execState pt $
-    unlessM (sMember u) $ do
-      sInsert (localU u)
-      modify' $ down p1 (CMany u p1 f1 f2 f z ct)
-      unlessM (sMember u) $ do
-        sInsert u
-        let !x = f2 z
-        modify' $ up x ct
+  PFoldGr u st f z p1 ->
+    if sMember u pt
+    then pt
+    else
+      let pt1 = down p1 (CFoldGr u st p1 f z ct) (sInsert (localU u) pt)
+      in if sMember u pt1
+         then pt1
+         else up z ct (sInsert u pt1)
+  PFoldMn u st f z p1 ->
+    if sMember u pt
+    then pt
+    else
+      let pt1 = if sMember (localU u) pt
+                then pt
+                else up z ct pt
+      in down p1 (CFoldMn u st p1 f z ct) (sInsert u pt1)
+  PMany u f1 f2 f z p1 ->
+    if sMember u pt
+    then pt
+    else
+      let pt1 = down p1 (CMany u p1 f1 f2 f z ct) (sInsert (localU u) pt)
+      in if sMember u pt1
+         then pt1
+         else
+           let !x = f2 z
+           in up x ct (sInsert u pt1)
 
 downNode :: Node c b -> Cont c b a -> StepState c a -> StepState c a
 downNode n !ct !pt = case n of
   NAccept b -> up b ct pt
-  NGuard u n1
-    | U.member u (sSet pt) -> pt
-    | otherwise -> downNode n1 ct (pt { sSet = U.insert u (sSet pt) })
+  NGuard u n1 ->
+    if sMember u pt
+    then pt
+    else downNode n1 ct (sInsert u pt)
   NToken t nxt ->
     pt { sNeed = NeedCCons t (CFmap_ nxt ct) (sNeed pt) }
   NEmpty -> pt
@@ -295,50 +293,48 @@ up b ct !pt = case ct of
   CLiftA2B st f a ct1 -> case st of
     Strict -> let !x = f a b in up x ct1 pt
     NonStrict -> up (f a b) ct1 pt
-  CAlt u ct1 -> flip execState pt $
-    unlessM (sMember u) $ do
-      sInsert u
-      modify' $ up b ct1
-  CFoldGr u st p1 f z ct1 -> flip execState pt $
-    unlessM (sMember u) $ do
-      lc <- sMember (localU u)
-      if lc then do
-        sInsert u
-        modify' $ up z ct1
-      else do
-        let go z1 = do
-              modify' $ down p1 (CFoldGr u st p1 f z1 ct1)
-              sInsert u
-              modify' $ up z1 ct1
+  CAlt u ct1 ->
+    if sMember u pt
+    then pt
+    else up b ct1 (sInsert u pt)
+  CFoldGr u st p1 f z ct1 ->
+    if sMember u pt
+    then pt
+    else
+      if sMember (localU u) pt
+      then up z ct1 (sInsert u pt)
+      else
+        let go z1 = let pt1 = down p1 (CFoldGr u st p1 f z1 ct1) pt
+                    in up z1 ct1 (sInsert u pt1)
             {-# INLINE go #-}
-        case st of
+        in case st of
           Strict -> let !z1 = f z b in go z1
           NonStrict -> go (f z b)
-  CFoldMn u st p1 f z ct1 -> flip execState pt $
-    unlessM (sMember u) $ do
-      let go z1 = do
-            sInsert (localU u)
-            modify' $ up z1 ct1
-            unlessM (sMember u) $ do
-              sInsert u
-              modify' $ down p1 (CFoldMn u st p1 f z1 ct1)
+  CFoldMn u st p1 f z ct1 ->
+    if sMember u pt
+    then pt
+    else
+      let go z1 = let pt1 = up z1 ct1 (sInsert (localU u) pt)
+                  in if sMember u pt1
+                     then pt1
+                     else down p1 (CFoldMn u st p1 f z1 ct1) (sInsert u pt1)
           {-# INLINE go #-}
-      case st of
+      in case st of
         Strict -> let !z1 = f z b in go z1
         NonStrict -> go (f z b)
-  CMany u p1 f1 f2 f z ct1 -> flip execState pt $
-    unlessM (sMember u) $ do
-      lc <- sMember (localU u)
-      if lc then do
-        sInsert u
+  CMany u p1 f1 f2 f z ct1 ->
+    if sMember u pt
+    then pt
+    else
+      if sMember (localU u) pt
+      then
         let !x = f1 b
-        modify' $ up x ct1
-      else do
+        in up x ct1 (sInsert u pt)
+      else
         let !z1 = f z b
-        modify' $ down p1 (CMany u p1 f1 f2 f z1 ct1)
-        sInsert u
-        let !x = f2 z1
-        modify' $ up x ct1
+            pt1 = down p1 (CMany u p1 f1 f2 f z1 ct1) pt
+            !x = f2 z1
+        in up x ct1 (sInsert u pt1)
 
 localU :: Unique -> Unique
 localU = Unique . (+1) . unUnique
@@ -479,15 +475,6 @@ parseNext p next = case prepareParser p of
         Nothing -> pure Nothing
         Just ps' -> loop ps'
 {-# INLINE parseNext #-}
-
----------
--- Util
----------
-
-unlessM :: Monad m => m Bool -> m () -> m ()
-unlessM mb mx = do
-  b <- mb
-  if b then pure () else mx
 
 -----------------
 -- Array compat
