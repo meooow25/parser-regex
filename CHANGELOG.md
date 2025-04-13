@@ -1,3 +1,9 @@
+### Next
+
+* Performance improvements
+  * Fix a pessimization due to boxity analysis in GHC >= 9.4. Improves parsing
+    time by up to 23%.
+
 ### 0.2.0.2 -- 2024-03-15
 
 * Compatibility with [MicroHs](https://github.com/augustss/MicroHs)

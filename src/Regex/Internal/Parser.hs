@@ -4,6 +4,10 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_HADDOCK not-home #-}
+#if __GLASGOW_HASKELL__ >= 904
+-- See Note [-fdmd-unbox-width]
+{-# OPTIONS_GHC -fdmd-unbox-width=4 #-}
+#endif
 
 -- | This is an internal module. You probably don't need to import this.
 --
@@ -227,6 +231,23 @@ sMember u pt = U.member u (sSet pt)
 
 sInsert :: Unique -> StepState c a -> StepState c a
 sInsert u pt = pt { sSet = U.insert u (sSet pt) }
+
+-- Note [-fdmd-unbox-width]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~
+-- GHC's worker/wrapper transformation is able to eliminate the StepState and
+-- generate a worker for `down` with signature
+--
+-- $wdown
+--   :: Parser c b -> Cont c b a
+--   -> Int# -> IntSet -> NeedCList c a -> Maybe a
+--   -> (# Int#, IntSet, NeedCList c a, Maybe a #)
+--
+-- and likewise for `downNode` and `up`.
+--
+-- This is great, but unfortunately boxity analysis gets in the way. Boxity
+-- analysis prevents unboxing of types with more than -fdmd-unbox-width fields,
+-- default 3 as of today. So we set it to the number of fields in StepState,
+-- i.e. 4, with an OPTIONS_GHC pragma.
 
 down :: Parser c b -> Cont c b a -> StepState c a -> StepState c a
 down p !ct !pt = case p of
