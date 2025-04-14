@@ -66,7 +66,7 @@ Just (URI { scheme = Just "https"
           , fragment = Just "parser-regex" })
 ```
 
-### More parsing
+### Parsing
 
 Parsing is straightforward, even for tasks which may be impractical with
 submatch extraction typically offered by regex libraries.
@@ -121,27 +121,44 @@ Just Orange
 
 ### Parse any sequence
 
-Regexes are not restricted to parsing text. For example, one may parse vectors
-from the [vector](https://hackage.haskell.org/package/vector) library, because
-why not.
+Parsing is not restricted to text. One can parse a
+[`vector`](https://hackage.haskell.org/package/vector), a
+[`conduit`](https://hackage.haskell.org/package/conduit), or any other sequence
+one might have.
 
 ```hs
-import Regex.Base (Parser)
 import qualified Regex.Base as R
-import qualified Data.Vector.Generic as VG
+import qualified Data.Vector.Generic as VG -- from vector
+import qualified Conduit as C -- from conduit
 
-parseVector :: VG.Vector v c => Parser c a -> v c -> Maybe a
+parseVector :: VG.Vector v c => R.Parser c a -> v c -> Maybe a
 parseVector = R.parseFoldr VG.foldr
+
+parseConduit :: Monad m => R.Parser c a -> C.ConduitT c x m (Maybe a)
+parseConduit p = R.parseNext p C.await <* C.sinkNull
 ```
 ```hs
 >>> import Control.Applicative (many)
->>> import qualified Data.Vector as V
 >>> import qualified Regex.Base as R
+>>> :{
+let evenOddP :: R.Parser Int [(Int, Int)]
+    evenOddP = R.compile $ many ((,) <$> R.satisfy even <*> R.satisfy odd)
+:}
 >>>
->>> let p = R.compile $ many ((,) <$> R.satisfy even <*> R.satisfy odd)
->>> let v = V.fromList [0..5] :: V.Vector Int
->>> parseVector p v
-Just [(0,1),(2,3),(4,5)]
+>>> import qualified Data.Vector as V
+>>> parseVector evenOddP (V.fromList [6,1,2,5,4,3])
+Just [(6,1),(2,5),(4,3)]
+>>> parseVector evenOddP (V.fromList [4,3,1,2])
+Nothing
+>>>
+>>> import Conduit ((.|))
+>>> import qualified Conduit as C
+>>> C.runConduit $ C.yieldMany [0..3] .| C.iterMC print .| parseConduit evenOddP
+0
+1
+2
+3
+Just [(0,1),(2,3)]
 ```
 
 ## Documentation
