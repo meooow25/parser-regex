@@ -412,24 +412,21 @@ type Foldr f a = forall b. (a -> b -> b) -> b -> f -> b
 -- ==== __Examples__
 --
 -- @
+-- import qualified Regex.Base as R
 -- import qualified Data.Vector.Generic as VG -- from vector
 --
--- import Regex.Base (Parser)
--- import qualified Regex.Base as R
---
--- parseVector :: VG.Vector v c => Parser c a -> v c -> Maybe a
+-- parseVector :: VG.Vector v c => R.Parser c a -> v c -> Maybe a
 -- parseVector p v = R.'parseFoldr' VG.foldr p v
 -- @
 --
 -- >>> import Control.Applicative (many)
--- >>> import qualified Data.Vector as V
--- >>> import Regex.Base (Parser)
 -- >>> import qualified Regex.Base as R
+-- >>> import qualified Data.Vector as V
 -- >>>
 -- >>> let p = R.compile $ many ((,) <$> R.satisfy even <*> R.satisfy odd) :: Parser Int [(Int, Int)]
--- >>> parseVector p (V.fromList [0..5])
--- Just [(0,1),(2,3),(4,5)]
--- >>> parseVector p (V.fromList [0,2..6])
+-- >>> parseVector p (V.fromList [6,1,2,5,4,3])
+-- Just [(6,1),(2,5),(4,3)]
+-- >>> parseVector p (V.fromList [4,3,1,2])
 -- Nothing
 --
 parseFoldr :: Foldr f c -> Parser c a -> f -> Maybe a
@@ -453,35 +450,30 @@ parseFoldr fr = \p xs -> prepareParser p >>= fr f finishParser xs
 -- ==== __Examples__
 --
 -- @
--- import Conduit (ConduitT, await, sinkNull) -- from conduit
---
--- import Regex.Base (Parser)
 -- import qualified Regex.Base as R
+-- import qualified Conduit as C -- from conduit
 --
--- parseConduit :: Monad m => Parser c a -> ConduitT c x m (Maybe a)
--- parseConduit p = R.'parseNext' p await <* sinkNull
+-- parseConduit :: Monad m => R.Parser c a -> C.ConduitT c x m (Maybe a)
+-- parseConduit p = R.'parseNext' p C.await <* C.sinkNull
 -- @
 --
 -- >>> import Control.Applicative (many)
--- >>> import Conduit ((.|), iterMC, runConduit, yieldMany)
--- >>> import Regex.Base (Parser)
 -- >>> import qualified Regex.Base as R
+-- >>> import Conduit ((.|))
+-- >>> import qualified Conduit as C
 -- >>>
 -- >>> let p = R.compile $ many ((,) <$> R.satisfy even <*> R.satisfy odd) :: Parser Int [(Int, Int)]
--- >>> let printYieldMany xs = yieldMany xs .| iterMC print
--- >>> runConduit $ printYieldMany [0..5] .| parseConduit p
+-- >>> runConduit $ C.yieldMany [0..3] .| C.iterMC print .| parseConduit p
 -- 0
 -- 1
 -- 2
 -- 3
+-- Just [(0,1),(2,3)]
+-- >>> runConduit $ C.yieldMany [4,3,1,2] .| C.iterMC print .| parseConduit p
 -- 4
--- 5
--- Just [(0,1),(2,3),(4,5)]
--- >>> runConduit $ printYieldMany [0,2..6] .| parseConduit p
--- 0
+-- 3
+-- 1
 -- 2
--- 4
--- 6
 -- Nothing
 --
 -- @since 0.2.0.0
