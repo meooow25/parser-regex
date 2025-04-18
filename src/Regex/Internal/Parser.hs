@@ -46,7 +46,7 @@ import qualified GHC.Exts as X
 #endif
 
 import Regex.Internal.Regex (RE(..), Greediness(..))
-import Regex.Internal.Solo (Solo, flipSolo)
+import Regex.Internal.Solo (Solo, matchSolo)
 import Regex.Internal.Unique (Unique(..), UniqueSet)
 import qualified Regex.Internal.Unique as U
 
@@ -284,7 +284,7 @@ down p !ct !pt = case p of
       let pt1 = down p1 (CMany u p1 f1 f2 f z ct) (sInsert (localU u) pt)
       in if sMember u pt1
          then pt1
-         else flipSolo (f2 z) $ \x -> up x ct (sInsert u pt1)
+         else matchSolo (f2 z) $ \x -> up x ct (sInsert u pt1)
 
 downNode :: Node c b -> Cont c b a -> StepState c a -> StepState c a
 downNode n !ct !pt = case n of
@@ -305,10 +305,10 @@ downNode n !ct !pt = case n of
 up :: b -> Cont c b a -> StepState c a -> StepState c a
 up b ct !pt = case ct of
   CTop -> pt { sResult = sResult pt <|> Just b }
-  CFmap f ct1 -> flipSolo (f b) $ \x -> up x ct1 pt
+  CFmap f ct1 -> matchSolo (f b) $ \x -> up x ct1 pt
   CFmap_ n ct1 -> downNode n ct1 pt
   CLiftA2A f p1 ct1 -> down p1 (CLiftA2B f b ct1) pt
-  CLiftA2B f a ct1 -> flipSolo (f a b) $ \x -> up x ct1 pt
+  CLiftA2B f a ct1 -> matchSolo (f a b) $ \x -> up x ct1 pt
   CAlt u ct1 ->
     if sMember u pt
     then pt
@@ -319,13 +319,13 @@ up b ct !pt = case ct of
     else
       if sMember (localU u) pt
       then up z ct1 (sInsert u pt)
-      else flipSolo (f z b) $ \z1 ->
+      else matchSolo (f z b) $ \z1 ->
         let pt1 = down p1 (CFoldGr u p1 f z1 ct1) pt
         in up z1 ct1 (sInsert u pt1)
   CFoldMn u p1 f z ct1 ->
     if sMember u pt
     then pt
-    else flipSolo (f z b) $ \z1 ->
+    else matchSolo (f z b) $ \z1 ->
       let pt1 = up z1 ct1 (sInsert (localU u) pt)
       in if sMember u pt1
          then pt1
@@ -335,11 +335,12 @@ up b ct !pt = case ct of
     then pt
     else
       if sMember (localU u) pt
-      then flipSolo (f1 b) $ \x -> up x ct1 (sInsert u pt)
-      else flipSolo (f z b) $ \z1 ->
-           flipSolo (f2 z1) $ \x ->
-        let pt1 = down p1 (CMany u p1 f1 f2 f z1 ct1) pt
-        in up x ct1 (sInsert u pt1)
+      then matchSolo (f1 b) $ \x -> up x ct1 (sInsert u pt)
+      else
+        matchSolo (f z b) $ \z1 ->
+        matchSolo (f2 z1) $ \x ->
+          let pt1 = down p1 (CMany u p1 f1 f2 f z1 ct1) pt
+          in up x ct1 (sInsert u pt1)
 
 localU :: Unique -> Unique
 localU = Unique . (+1) . unUnique

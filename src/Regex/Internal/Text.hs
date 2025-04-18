@@ -85,7 +85,7 @@ import Regex.Internal.Regex (RE(..), Greediness(..))
 import qualified Regex.Internal.Regex as R
 import qualified Regex.Internal.Num as RNum
 import qualified Regex.Internal.Generated.CaseFold as CF
-import Regex.Internal.Solo (Solo, mkSolo', solo)
+import Regex.Internal.Solo (Solo, mkSolo', matchSolo)
 
 ----------------------
 -- Token and Text REs
@@ -426,10 +426,11 @@ pureWM :: a -> WithMatch a
 pureWM x = WM T.empty x
 
 fmapWM :: (a -> Solo b) -> WithMatch a -> WithMatch b
-fmapWM f (WM t x) = solo (WM t) (f x)
+fmapWM f (WM t x) = matchSolo (f x) (WM t)
 
 liftA2WM :: (a1 -> a2 -> Solo b) -> WithMatch a1 -> WithMatch a2 -> WithMatch b
-liftA2WM f (WM t1 x) (WM t2 y) = solo (WM (unsafeAdjacentAppend t1 t2)) (f x y)
+liftA2WM f (WM t1 x) (WM t2 y) =
+  matchSolo (f x y) (WM (unsafeAdjacentAppend t1 t2))
 
 withMatch = R.fmap' (\(WM t x) -> (t,x)) . go
   where

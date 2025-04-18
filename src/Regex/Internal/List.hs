@@ -54,7 +54,7 @@ import Regex.Internal.Regex (RE(..), Greediness(..))
 import qualified Regex.Internal.Regex as R
 import qualified Regex.Internal.Num as RNum
 import qualified Regex.Internal.Generated.CaseFold as CF
-import Regex.Internal.Solo (Solo, mkSolo', solo)
+import Regex.Internal.Solo (Solo, mkSolo', matchSolo)
 
 ------------------------
 -- REs and combinators
@@ -247,14 +247,14 @@ toMatch_ re = case re of
 data WithMatch c a = WM !(DList c) a
 
 fmapWM :: (a -> Solo b) -> WithMatch c a -> WithMatch c b
-fmapWM f (WM t x) = solo (WM t) (f x)
+fmapWM f (WM t x) = matchSolo (f x) (WM t)
 
 pureWM :: a -> WithMatch c a
 pureWM = WM mempty
 
 liftA2WM
   :: (a1 -> a2 -> Solo b) -> WithMatch c a1 -> WithMatch c a2 -> WithMatch c b
-liftA2WM f (WM t1 x) (WM t2 y) = solo (WM (t1 <> t2)) (f x y)
+liftA2WM f (WM t1 x) (WM t2 y) = matchSolo (f x y) (WM (t1 <> t2))
 
 -- | Rebuild the @RE@ to include the matched section of the list alongside the
 -- result.
