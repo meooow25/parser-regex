@@ -232,13 +232,13 @@ toMatch = fmap dToL . toMatch_
 
 toMatch_ :: RE c b -> RE c (DList c)
 toMatch_ re = case re of
-  RToken t -> RToken (\c -> singletonD c <$ t c)
+  RToken t -> R.token (\c -> singletonD c <$ t c)
   RFmap _ re1 -> toMatch_ re1
   RFmap_ _ re1 -> toMatch_ re1
-  RPure _ -> RPure mempty
+  RPure _ -> pure mempty
   RLiftA2 _ re1 re2 -> R.liftA2' (<>) (toMatch_ re1) (toMatch_ re2)
-  REmpty -> REmpty
-  RAlt re1 re2 -> RAlt (toMatch_ re1) (toMatch_ re2)
+  REmpty -> Ap.empty
+  RAlt re1 re2 -> toMatch_ re1 <|> toMatch_ re2
   RMany _ _ _ _ re1 -> R.foldlMany' (<>) mempty (toMatch_ re1)
   RFold gr _ _ re1 -> case gr of
     Greedy -> R.foldlMany' (<>) mempty (toMatch_ re1)
