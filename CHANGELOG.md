@@ -1,5 +1,7 @@
 ### Next
 
+* Breaking changes—`Internal` modules only
+  * Changes to internal representations
 * Performance improvements
   * Fix a pessimization due to boxity analysis in GHC >= 9.4. Improves parsing
     time by up to 23%.

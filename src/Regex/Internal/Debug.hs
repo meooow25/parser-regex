@@ -22,7 +22,7 @@ import Data.Maybe (isJust)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IM
 
-import Regex.Internal.Regex (RE(..), Strictness(..), Greediness(..))
+import Regex.Internal.Regex (RE(..), Greediness(..))
 import Regex.Internal.Parser (Node(..), Parser(..))
 import Regex.Internal.Unique (Unique(..))
 import qualified Regex.Internal.CharSet as CS
@@ -44,15 +44,15 @@ reToDot ma re0 = execM $ do
     go :: forall b. RE c b -> M Id
     go re = case re of
       RToken t -> new $ labelToken "RToken" t ma
-      RFmap st _ re1 ->
-        withNew (str "RFmap" <+> dispsSt st) $ \i ->
+      RFmap _ re1 ->
+        withNew (str "RFmap") $ \i ->
           go re1 >>= writeEdge i
       RFmap_ _ re1 ->
         withNew (str "RFmap_") $ \i ->
           go re1 >>= writeEdge i
       RPure _ -> new (str "RPure")
-      RLiftA2 st _ re1 re2 ->
-        withNew (str "RLiftA2" <+> dispsSt st) $ \i -> do
+      RLiftA2 _ re1 re2 ->
+        withNew (str "RLiftA2") $ \i -> do
           go re1 >>= writeEdge i
           go re2 >>= writeEdge i
       REmpty -> new (str "REmpty")
@@ -60,8 +60,8 @@ reToDot ma re0 = execM $ do
         withNew (str "RAlt") $ \i -> do
           go re1 >>= writeEdge i
           go re2 >>= writeEdge i
-      RFold st gr _ _ re1 ->
-        withNew (str "RFold" <+> dispsSt st <+> dispsGr gr) $ \i ->
+      RFold gr _ _ re1 ->
+        withNew (str "RFold" <+> dispsGr gr) $ \i ->
           go re1 >>= writeEdge i
       RMany _ _ _ _ re1 ->
         withNew (str "RMany") $ \i ->
@@ -84,8 +84,8 @@ parserToDot ma p0 = execM $ do
     go :: forall b. Parser c b -> M Id
     go p = case p of
       PToken t -> new $ labelToken "PToken" t ma
-      PFmap st _ re1 ->
-        withNew (str "PFmap" <+> dispsSt st) $ \i ->
+      PFmap _ re1 ->
+        withNew (str "PFmap") $ \i ->
           go re1 >>= writeEdge i
       PFmap_ node ->
         withNew (str "PFmap_") $ \i -> do
@@ -94,8 +94,8 @@ parserToDot ma p0 = execM $ do
           writeLn (str "}")
           writeEdge i j
       PPure _ -> new (str "PPure")
-      PLiftA2 st _ re1 re2 ->
-        withNew (str "PLiftA2" <+> dispsSt st) $ \i -> do
+      PLiftA2 _ re1 re2 ->
+        withNew (str "PLiftA2") $ \i -> do
           go re1 >>= writeEdge i
           go re2 >>= writeEdge i
       PEmpty -> new (str "PEmpty")
@@ -107,11 +107,11 @@ parserToDot ma p0 = execM $ do
       PMany _ _ _ _ _ re1 ->
         withNew (str "PMany") $ \i ->
           go re1 >>= writeEdge i
-      PFoldGr _ st _ _ re1 ->
-        withNew (str "PFoldGr" <+> dispsSt st) $ \i ->
+      PFoldGr _ _ _ re1 ->
+        withNew (str "PFoldGr") $ \i ->
           go re1 >>= writeEdge i
-      PFoldMn _ st _ _ re1 ->
-        withNew (str "PFoldMn" <+> dispsSt st) $ \i ->
+      PFoldMn _ _ _ re1 ->
+        withNew (str "PFoldMn") $ \i ->
           go re1 >>= writeEdge i
 
     goNode :: forall b. Node c b -> StateT (IntMap Id) M Id
@@ -157,11 +157,6 @@ instance Semigroup Str where
 
 instance Monoid Str where
   mempty = Str id
-
-dispsSt :: Strictness -> Str
-dispsSt st = case st of
-  Strict -> str "S"
-  NonStrict -> str "NS"
 
 dispsGr :: Greediness -> Str
 dispsGr gr = case gr of

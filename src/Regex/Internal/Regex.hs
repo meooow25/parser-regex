@@ -6,7 +6,6 @@
 --
 module Regex.Internal.Regex
   ( RE(..)
-  , Strictness(..)
   , Greediness(..)
   , Many(..)
 
@@ -53,6 +52,8 @@ import Data.Semigroup (Semigroup(..))
 import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 
+import Regex.Internal.Solo (Solo, mkSolo, mkSolo')
+
 ---------------------------------
 -- RE and constructor functions
 ---------------------------------
@@ -90,35 +91,36 @@ import qualified Data.Traversable as T
 -- /Performance tip/: Prefer the smaller of equivalent regexes, i.e. prefer
 -- @(a \<|> b) \<*> c@ over @(a \<*> c) \<|> (b \<*> c)@.
 --
+
+-- See Note [Functions returning Solo]
 data RE c a where
   RToken  :: !(c -> Maybe a) -> RE c a
-  RFmap   :: !Strictness -> !(a1 -> a) -> !(RE c a1) -> RE c a
+  RFmap   :: !(a1 -> Solo a) -> !(RE c a1) -> RE c a
   RFmap_  :: a -> !(RE c a1) -> RE c a
   RPure   :: a -> RE c a
-  RLiftA2 :: !Strictness -> !(a1 -> a2 -> a) -> !(RE c a1) -> !(RE c a2) -> RE c a
+  RLiftA2 :: !(a1 -> a2 -> Solo a) -> !(RE c a1) -> !(RE c a2) -> RE c a
   REmpty  :: RE c a
   RAlt    :: !(RE c a) -> !(RE c a) -> RE c a
-  RFold   :: !Strictness -> !Greediness -> !(a -> a1 -> a) -> a -> !(RE c a1) -> RE c a
-  RMany   :: !(a1 -> a) -> !(a2 -> a) -> !(a2 -> a1 -> a2) -> !a2 -> !(RE c a1) -> RE c a -- Strict and greedy implicitly
+  RFold   :: !Greediness -> !(a -> a1 -> Solo a) -> a -> !(RE c a1) -> RE c a
+  RMany   :: !(a1 -> Solo a) -> !(a2 -> Solo a) -> !(a2 -> a1 -> Solo a2) -> !a2 -> !(RE c a1) -> RE c a -- Greedy
 
-data Strictness = Strict | NonStrict
 data Greediness = Greedy | Minimal
 
 instance Functor (RE c) where
-  fmap = RFmap NonStrict
+  fmap f = RFmap (\x -> mkSolo (f x))
   (<$) = RFmap_
 
 fmap' :: (a -> b) -> RE c a -> RE c b
-fmap' = RFmap Strict
+fmap' f = RFmap (\x -> mkSolo' (f x))
 
 instance Applicative (RE c) where
   pure = RPure
-  liftA2 = RLiftA2 NonStrict
-  re1 *> re2 = Ap.liftA2 (const id) (void re1) re2
-  re1 <* re2 = Ap.liftA2 const re1 (void re2)
+  liftA2 f = RLiftA2 (\x y -> mkSolo (f x y))
+  re1 *> re2 = RLiftA2 (\_ y -> mkSolo y) (void re1) re2
+  re1 <* re2 = RLiftA2 (\x _ -> mkSolo x) re1 (void re2)
 
 liftA2' :: (a1 -> a2 -> b) -> RE c a1 -> RE c a2 -> RE c b
-liftA2' = RLiftA2 Strict
+liftA2' f = RLiftA2 (\x y -> mkSolo' (f x y))
 
 instance Alternative (RE c) where
   empty = REmpty
@@ -150,24 +152,29 @@ token = RToken
 --
 -- Also see the section "Looping parsers".
 manyr :: RE c a -> RE c (Many a)
-manyr = RMany Repeat (Finite . reverse) (flip (:)) []
+manyr =
+  RMany
+    (\xs -> mkSolo' (Repeat xs))
+    (\xs -> mkSolo' (Finite (reverse xs)))
+    (\xs x -> mkSolo' (x:xs))
+    []
 
 -- | Parse many occurences of the given @RE@. Biased towards matching more.
 --
 -- Also see the section "Looping parsers".
 foldlMany :: (b -> a -> b) -> b -> RE c a -> RE c b
-foldlMany = RFold NonStrict Greedy
+foldlMany f = RFold Greedy (\z x -> mkSolo (f z x))
 
 foldlMany' :: (b -> a -> b) -> b -> RE c a -> RE c b
-foldlMany' f !z = RFold Strict Greedy f z
+foldlMany' f !z = RFold Greedy (\z' x -> mkSolo' (f z' x)) z
 
 -- | Parse many occurences of the given @RE@. Minimal, i.e. biased towards
 -- matching less.
 foldlManyMin :: (b -> a -> b) -> b -> RE c a -> RE c b
-foldlManyMin = RFold NonStrict Minimal
+foldlManyMin f = RFold Minimal (\z x -> mkSolo (f z x))
 
 foldlManyMin' :: (b -> a -> b) -> b -> RE c a -> RE c b
-foldlManyMin' f !z = RFold Strict Minimal f z
+foldlManyMin' f !z = RFold Minimal (\z' x -> mkSolo' (f z' x)) z
 
 -- | Parse a @c@ if it satisfies the given predicate.
 satisfy :: (c -> Bool) -> RE c c
@@ -362,3 +369,33 @@ toFindMany :: RE c a -> RE c [a]
 toFindMany re =
   reverse <$>
   foldlMany' (flip ($)) [] ((:) <$> re <|> id <$ anySingle)
+
+----------
+-- Notes
+----------
+
+-- Note [Functions returning Solo]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- We use `-> Solo a` functions in RFmap, RLiftA2, RFold, RMany to get better
+-- control of the evaluation and avoid wastefully creating thunks.
+--
+-- Under normal circumstances, GHC does a good job of avoiding such thunks using
+-- demand analysis. However, for a function stored in a RE, there is no way to
+-- know its demand characteristics, making such optimizations impossible.
+--
+-- So, Solo is a way to get some /manual/ control over evaluation. For functions
+-- where we want to avoid thunks we use strict combinators, e.g. `liftA2' (:)`,
+-- so that forcing the Solo forces the result. Where we don't want to force the
+-- result, we use lazy combinators which simply put the thunk in the Solo, e.g.
+-- `fmap reverse`.
+--
+-- On GHC, Solo is implemented as an unboxed 1-tuple at no extra cost. It does
+-- have a cost on non-GHC however.
+--
+-- An alternative is to store the strictness of the function alongside it, as a
+-- Bool for instance, and force the result when applying the function if it is
+-- strict. In fact, this is how it was originally implemented here. This method
+-- adds memory costs to the RE and makes the code a little more complicated. The
+-- current setup also might incur a memory cost if an unknown function has to
+-- be wrapped in a function which returns Solo. But in practice the function is
+-- usually statically known and wrapping function gets simplified.

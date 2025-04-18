@@ -50,10 +50,11 @@ import Data.CharSet (CharSet)
 import qualified Data.CharSet as CS
 import Regex.Internal.Parser (Parser)
 import qualified Regex.Internal.Parser as P
-import Regex.Internal.Regex (RE(..), Greediness(..), Strictness(..))
+import Regex.Internal.Regex (RE(..), Greediness(..))
 import qualified Regex.Internal.Regex as R
 import qualified Regex.Internal.Num as RNum
 import qualified Regex.Internal.Generated.CaseFold as CF
+import Regex.Internal.Solo (Solo, mkSolo', matchSolo)
 
 ------------------------
 -- REs and combinators
@@ -231,30 +232,29 @@ toMatch = fmap dToL . toMatch_
 
 toMatch_ :: RE c b -> RE c (DList c)
 toMatch_ re = case re of
-  RToken t -> RToken (\c -> singletonD c <$ t c)
-  RFmap _ _ re1 -> toMatch_ re1
+  RToken t -> R.token (\c -> singletonD c <$ t c)
+  RFmap _ re1 -> toMatch_ re1
   RFmap_ _ re1 -> toMatch_ re1
-  RPure _ -> RPure mempty
-  RLiftA2 _ _ re1 re2 -> RLiftA2 Strict (<>) (toMatch_ re1) (toMatch_ re2)
-  REmpty -> REmpty
-  RAlt re1 re2 -> RAlt (toMatch_ re1) (toMatch_ re2)
-  RMany _ _ _ _ re1 -> RFold Strict Greedy (<>) mempty (toMatch_ re1)
-  RFold _ gr _ _ re1 -> RFold Strict gr (<>) mempty (toMatch_ re1)
+  RPure _ -> pure mempty
+  RLiftA2 _ re1 re2 -> R.liftA2' (<>) (toMatch_ re1) (toMatch_ re2)
+  REmpty -> Ap.empty
+  RAlt re1 re2 -> toMatch_ re1 <|> toMatch_ re2
+  RMany _ _ _ _ re1 -> R.foldlMany' (<>) mempty (toMatch_ re1)
+  RFold gr _ _ re1 -> case gr of
+    Greedy -> R.foldlMany' (<>) mempty (toMatch_ re1)
+    Minimal -> R.foldlManyMin' (<>) mempty (toMatch_ re1)
 
 data WithMatch c a = WM !(DList c) a
 
-instance Functor (WithMatch c) where
-  fmap f (WM t x) = WM t (f x)
+fmapWM :: (a -> Solo b) -> WithMatch c a -> WithMatch c b
+fmapWM f (WM t x) = matchSolo (f x) (WM t)
 
-fmapWM' :: (a -> b) -> WithMatch c a -> WithMatch c b
-fmapWM' f (WM t x) = WM t $! f x
+pureWM :: a -> WithMatch c a
+pureWM = WM mempty
 
-instance Applicative (WithMatch c) where
-  pure = WM mempty
-  liftA2 f (WM t1 x) (WM t2 y) = WM (t1 <> t2) (f x y)
-
-liftA2WM' :: (a1 -> a2 -> b) -> WithMatch c a1 -> WithMatch c a2 -> WithMatch c b
-liftA2WM' f (WM t1 x) (WM t2 y) = WM (t1 <> t2) $! f x y
+liftA2WM
+  :: (a1 -> a2 -> Solo b) -> WithMatch c a1 -> WithMatch c a2 -> WithMatch c b
+liftA2WM f (WM t1 x) (WM t2 y) = matchSolo (f x y) (WM (t1 <> t2))
 
 -- | Rebuild the @RE@ to include the matched section of the list alongside the
 -- result.
@@ -263,28 +263,23 @@ withMatch = R.fmap' (\(WM cs x) -> (dToL cs, x)) . go
   where
     go :: RE c b -> RE c (WithMatch c b)
     go re = case re of
-      RToken t -> RToken (\c -> WM (singletonD c) <$> t c)
-      RFmap st f re1 ->
-        let g = case st of
-              Strict -> fmapWM' f
-              NonStrict -> fmap f
-        in RFmap Strict g (go re1)
-      RFmap_ b re1 -> RFmap Strict (flip WM b) (toMatch_ re1)
-      RPure b -> RPure (pure b)
-      RLiftA2 st f re1 re2 ->
-        let g = case st of
-              Strict -> liftA2WM' f
-              NonStrict -> Ap.liftA2 f
-        in RLiftA2 Strict g (go re1) (go re2)
-      REmpty -> REmpty
-      RAlt re1 re2 -> RAlt (go re1) (go re2)
+      RToken t -> R.token (\c -> WM (singletonD c) <$> t c)
+      RFmap f re1 -> R.fmap' (fmapWM f) (go re1)
+      RFmap_ b re1 -> R.fmap' (flip WM b) (toMatch_ re1)
+      RPure b -> pure (pureWM b)
+      RLiftA2 f re1 re2 -> R.liftA2' (liftA2WM f) (go re1) (go re2)
+      REmpty -> Ap.empty
+      RAlt re1 re2 -> go re1 <|> go re2
       RMany f1 f2 f z re1 ->
-        RMany (fmapWM' f1) (fmapWM' f2) (liftA2WM' f) (pure z) (go re1)
-      RFold st gr f z re1 ->
-        let g = case st of
-              Strict -> liftA2WM' f
-              NonStrict -> Ap.liftA2 f
-        in RFold Strict gr g (pure z) (go re1)
+        RMany
+          (\x -> mkSolo' (fmapWM f1 x))
+          (\x -> mkSolo' (fmapWM f2 x))
+          (\x y -> mkSolo' (liftA2WM f x y))
+          (pureWM z)
+          (go re1)
+      RFold gr f z re1 -> case gr of
+        Greedy -> R.foldlMany' (liftA2WM f) (pureWM z) (go re1)
+        Minimal -> R.foldlManyMin' (liftA2WM f) (pureWM z) (go re1)
 
 ----------
 -- Parse
