@@ -45,7 +45,7 @@ import Data.Primitive.SmallArray
 import qualified GHC.Exts as X
 #endif
 
-import Regex.Internal.Regex (RE(..), Greediness(..))
+import Regex.Internal.Regex (RE(..))
 import Regex.Internal.Solo (Solo, matchSolo)
 import Regex.Internal.Unique (Unique(..), UniqueSet)
 import qualified Regex.Internal.Unique as U
@@ -109,12 +109,14 @@ compileToParser re = case re of
     p2 <- compileToParser re2
     ps <- T.traverse compileToParser res
     pure $ PAlt u p1 p2 (smallArrayFromList ps)
-  RFold gr f z re1 -> do
+  RFoldGr f z re1 -> do
     u <- nxtU
     _localU <- nxtU
-    case gr of
-      Greedy -> PFoldGr u f z <$> compileToParser re1
-      Minimal -> PFoldMn u f z <$> compileToParser re1
+    PFoldGr u f z <$> compileToParser re1
+  RFoldMn f z re1 -> do
+    u <- nxtU
+    _localU <- nxtU
+    PFoldMn u f z <$> compileToParser re1
   RMany f1 f2 f z re1 -> do
     u <- nxtU
     _localU <- nxtU
@@ -139,17 +141,17 @@ compileToNode a re0 = go re0 (NAccept a)
         n2 <- go re2 nxt1
         ns <- T.traverse (flip go nxt1) res
         pure $ NAlt n1 n2 (smallArrayFromList ns)
-      RFold gr _ _ re1 -> goMany gr re1 nxt
-      RMany _ _ _ _ re1 -> goMany Greedy re1 nxt
-    goMany :: forall a2.
-              Greediness -> RE c a2 -> Node c a -> State Unique (Node c a)
-    goMany gr re1 nxt = do
+      RFoldGr _ _ re1 -> goMany True re1 nxt
+      RFoldMn _ _ re1 -> goMany False re1 nxt
+      RMany _ _ _ _ re1 -> goMany True re1 nxt
+    goMany :: forall a2. Bool -> RE c a2 -> Node c a -> State Unique (Node c a)
+    goMany greedy re1 nxt = do
       u <- nxtU
       mfix $ \n -> do
         ndown <- go re1 n
-        case gr of
-           Greedy -> pure $ NGuard u (NAlt ndown nxt emptySmallArray)
-           Minimal -> pure $ NGuard u (NAlt nxt ndown emptySmallArray)
+        if greedy
+        then pure $ NGuard u (NAlt ndown nxt emptySmallArray)
+        else pure $ NGuard u (NAlt nxt ndown emptySmallArray)
 
 gatherAlts :: RE c a -> RE c a -> (RE c a, RE c a, [RE c a])
 gatherAlts re01 re02 = case go re01 (go re02 []) of
@@ -191,8 +193,9 @@ checkSize lim re0 = isJust (evalStateT (go re0) 0)
         RLiftA2 _ re1 re2 -> inc *> go re1 *> go re2
         REmpty -> inc
         RAlt re1 re2 -> inc *> go re1 *> go re2
+        RFoldGr _ _ re1 -> inc *> go re1
+        RFoldMn _ _ re1 -> inc *> go re1
         RMany _ _ _ _ re1 -> inc *> go re1
-        RFold _ _ _ re1 -> inc *> go re1
     inc = do
       ok <- gets (< lim)
       if ok
