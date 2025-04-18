@@ -52,6 +52,7 @@ library
         Regex.Internal.Debug
         Regex.Internal.Parser
         Regex.Internal.Regex
+        Regex.Internal.Solo
         Regex.Internal.Text
         Regex.Internal.Unique
 

@@ -81,10 +81,11 @@ import Data.CharSet (CharSet)
 import qualified Data.CharSet as CS
 import Regex.Internal.Parser (Parser)
 import qualified Regex.Internal.Parser as P
-import Regex.Internal.Regex (RE(..), Greediness(..), Strictness(..))
+import Regex.Internal.Regex (RE(..), Greediness(..))
 import qualified Regex.Internal.Regex as R
 import qualified Regex.Internal.Num as RNum
 import qualified Regex.Internal.Generated.CaseFold as CF
+import Regex.Internal.Solo (Solo, mkSolo', solo)
 
 ----------------------
 -- Token and Text REs
@@ -400,17 +401,18 @@ toMatch = go
     go :: REText b -> REText Text
     go re = case re of
       RToken t -> tokenMatch t
-      RFmap _ _ re1 -> go re1
+      RFmap _ re1 -> go re1
       RFmap_ _ re1 -> go re1
-      RPure _ -> RPure T.empty
-      RLiftA2 _ _ re1 re2 ->
-        RLiftA2 Strict unsafeAdjacentAppend (go re1) (go re2)
-      REmpty -> REmpty
-      RAlt re1 re2 -> RAlt (go re1) (go re2)
+      RPure _ -> pure T.empty
+      RLiftA2 _ re1 re2 ->
+        R.liftA2' unsafeAdjacentAppend (go re1) (go re2)
+      REmpty -> Ap.empty
+      RAlt re1 re2 -> go re1 <|> go re2
       RMany _ _ _ _ re1 ->
-        RFold Strict Greedy unsafeAdjacentAppend T.empty (go re1)
-      RFold _ gr _ _ re1 ->
-        RFold Strict gr unsafeAdjacentAppend T.empty (go re1)
+        R.foldlMany' unsafeAdjacentAppend T.empty (go re1)
+      RFold gr _ _ re1 -> case gr of
+        Greedy -> R.foldlMany' unsafeAdjacentAppend T.empty (go re1)
+        Minimal -> R.foldlManyMin' unsafeAdjacentAppend T.empty (go re1)
 #else
 toMatch = fmap (T.pack . map tChar) . RL.toMatch
 #endif
@@ -420,45 +422,36 @@ withMatch :: REText a -> REText (Text, a)
 #ifdef __GLASGOW_HASKELL__
 data WithMatch a = WM {-# UNPACK #-} !Text a
 
-instance Functor WithMatch where
-  fmap f (WM t x) = WM t (f x)
+pureWM :: a -> WithMatch a
+pureWM x = WM T.empty x
 
-fmapWM' :: (a -> b) -> WithMatch a -> WithMatch b
-fmapWM' f (WM t x) = WM t $! f x
+fmapWM :: (a -> Solo b) -> WithMatch a -> WithMatch b
+fmapWM f (WM t x) = solo (WM t) (f x)
 
-instance Applicative WithMatch where
-  pure = WM T.empty
-  liftA2 f (WM t1 x) (WM t2 y) = WM (unsafeAdjacentAppend t1 t2) (f x y)
-
-liftA2WM' :: (a1 -> a2 -> b) -> WithMatch a1 -> WithMatch a2 -> WithMatch b
-liftA2WM' f (WM t1 x) (WM t2 y) = WM (unsafeAdjacentAppend t1 t2) $! f x y
+liftA2WM :: (a1 -> a2 -> Solo b) -> WithMatch a1 -> WithMatch a2 -> WithMatch b
+liftA2WM f (WM t1 x) (WM t2 y) = solo (WM (unsafeAdjacentAppend t1 t2)) (f x y)
 
 withMatch = R.fmap' (\(WM t x) -> (t,x)) . go
   where
     go :: REText b -> REText (WithMatch b)
     go re = case re of
       RToken t -> tokenWithMatch t
-      RFmap st f re1 ->
-        let g = case st of
-              Strict -> fmapWM' f
-              NonStrict -> fmap f
-        in RFmap Strict g (go re1)
-      RFmap_ b re1 -> RFmap Strict (flip WM b) (toMatch re1)
-      RPure b -> RPure (pure b)
-      RLiftA2 st f re1 re2 ->
-        let g = case st of
-              Strict -> liftA2WM' f
-              NonStrict -> Ap.liftA2 f
-        in RLiftA2 Strict g (go re1) (go re2)
-      REmpty -> REmpty
-      RAlt re1 re2 -> RAlt (go re1) (go re2)
+      RFmap f re1 -> R.fmap' (fmapWM f) (go re1)
+      RFmap_ b re1 -> R.fmap' (flip WM b) (toMatch re1)
+      RPure b -> pure (pureWM b)
+      RLiftA2 f re1 re2 -> R.liftA2' (liftA2WM f) (go re1) (go re2)
+      REmpty -> Ap.empty
+      RAlt re1 re2 ->  go re1 <|> go re2
       RMany f1 f2 f z re1 ->
-        RMany (fmapWM' f1) (fmapWM' f2) (liftA2WM' f) (pure z) (go re1)
-      RFold st gr f z re1 ->
-        let g = case st of
-              Strict -> liftA2WM' f
-              NonStrict -> Ap.liftA2 f
-        in RFold Strict gr g (pure z) (go re1)
+        RMany
+          (\x -> mkSolo' (fmapWM f1 x))
+          (\x -> mkSolo' (fmapWM f2 x))
+          (\x y -> mkSolo' (liftA2WM f x y))
+          (pureWM z)
+          (go re1)
+      RFold gr f z re1 -> case gr of
+        Greedy -> R.foldlMany' (liftA2WM f) (pureWM z) (go re1)
+        Minimal -> R.foldlManyMin' (liftA2WM f) (pureWM z) (go re1)
 #else
 withMatch = fmap (\(toks, x) -> (T.pack (map tChar toks), x)) . RL.withMatch
 #endif

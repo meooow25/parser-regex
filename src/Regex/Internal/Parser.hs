@@ -45,7 +45,8 @@ import Data.Primitive.SmallArray
 import qualified GHC.Exts as X
 #endif
 
-import Regex.Internal.Regex (RE(..), Strictness(..), Greediness(..))
+import Regex.Internal.Regex (RE(..), Greediness(..))
+import Regex.Internal.Solo (Solo, flipSolo)
 import Regex.Internal.Unique (Unique(..), UniqueSet)
 import qualified Regex.Internal.Unique as U
 
@@ -56,15 +57,15 @@ import qualified Regex.Internal.Unique as U
 -- | A parser compiled from a @'RE' c a@.
 data Parser c a where
   PToken  :: !(c -> Maybe a) -> Parser c a
-  PFmap   :: !Strictness -> !(a1 -> a) -> !(Parser c a1) -> Parser c a
+  PFmap   :: !(a1 -> Solo a) -> !(Parser c a1) -> Parser c a
   PFmap_  :: !(Node c a) -> Parser c a
   PPure   :: a -> Parser c a
-  PLiftA2 :: !Strictness -> !(a1 -> a2 -> a) -> !(Parser c a1) -> !(Parser c a2) -> Parser c a
+  PLiftA2 :: !(a1 -> a2 -> Solo a) -> !(Parser c a1) -> !(Parser c a2) -> Parser c a
   PEmpty  :: Parser c a
   PAlt    :: {-# UNPACK #-} !Unique -> !(Parser c a) -> !(Parser c a) -> {-# UNPACK #-} !(SmallArray (Parser c a)) -> Parser c a
-  PFoldGr :: {-# UNPACK #-} !Unique -> !Strictness -> !(a -> a1 -> a) -> a -> !(Parser c a1) -> Parser c a
-  PFoldMn :: {-# UNPACK #-} !Unique -> !Strictness -> !(a -> a1 -> a) -> a -> !(Parser c a1) -> Parser c a
-  PMany   :: {-# UNPACK #-} !Unique -> !(a1 -> a) -> !(a2 -> a) -> !(a2 -> a1 -> a2) -> !a2 -> !(Parser c a1) -> Parser c a
+  PFoldGr :: {-# UNPACK #-} !Unique -> !(a -> a1 -> Solo a) -> a -> !(Parser c a1) -> Parser c a
+  PFoldMn :: {-# UNPACK #-} !Unique -> !(a -> a1 -> Solo a) -> a -> !(Parser c a1) -> Parser c a
+  PMany   :: {-# UNPACK #-} !Unique -> !(a1 -> Solo a) -> !(a2 -> Solo a) -> !(a2 -> a1 -> Solo a2) -> !a2 -> !(Parser c a1) -> Parser c a
 
 -- | A node in the NFA. Used for recognition.
 data Node c a where
@@ -95,11 +96,11 @@ nxtU = state $ \u -> let !u' = Unique (unUnique u + 1) in (u, u')
 compileToParser :: RE c a -> State Unique (Parser c a)
 compileToParser re = case re of
   RToken t -> pure $ PToken t
-  RFmap st f re1 -> PFmap st f <$> compileToParser re1
+  RFmap f re1 -> PFmap f <$> compileToParser re1
   RFmap_ a re1 -> PFmap_ <$> compileToNode a re1
   RPure a -> pure $ PPure a
-  RLiftA2 st f re1 re2 ->
-    Ap.liftA2 (PLiftA2 st f) (compileToParser re1) (compileToParser re2)
+  RLiftA2 f re1 re2 ->
+    Ap.liftA2 (PLiftA2 f) (compileToParser re1) (compileToParser re2)
   REmpty -> pure PEmpty
   RAlt re01 re02 -> do
     u <- nxtU
@@ -108,12 +109,12 @@ compileToParser re = case re of
     p2 <- compileToParser re2
     ps <- T.traverse compileToParser res
     pure $ PAlt u p1 p2 (smallArrayFromList ps)
-  RFold st gr f z re1 -> do
+  RFold gr f z re1 -> do
     u <- nxtU
     _localU <- nxtU
     case gr of
-      Greedy -> PFoldGr u st f z <$> compileToParser re1
-      Minimal -> PFoldMn u st f z <$> compileToParser re1
+      Greedy -> PFoldGr u f z <$> compileToParser re1
+      Minimal -> PFoldMn u f z <$> compileToParser re1
   RMany f1 f2 f z re1 -> do
     u <- nxtU
     _localU <- nxtU
@@ -125,10 +126,10 @@ compileToNode a re0 = go re0 (NAccept a)
     go :: forall a2. RE c a2 -> Node c a -> State Unique (Node c a)
     go re nxt = case re of
       RToken t -> pure $ NToken t nxt
-      RFmap _ _ re1 -> go re1 nxt
+      RFmap _ re1 -> go re1 nxt
       RFmap_ _ re1 -> go re1 nxt
       RPure _ -> pure nxt
-      RLiftA2 _ _ re1 re2 -> go re2 nxt >>= go re1
+      RLiftA2 _ re1 re2 -> go re2 nxt >>= go re1
       REmpty -> pure NEmpty
       RAlt re01 re02 -> do
         u <- nxtU
@@ -138,7 +139,7 @@ compileToNode a re0 = go re0 (NAccept a)
         n2 <- go re2 nxt1
         ns <- T.traverse (flip go nxt1) res
         pure $ NAlt n1 n2 (smallArrayFromList ns)
-      RFold _ gr _ _ re1 -> goMany gr re1 nxt
+      RFold gr _ _ re1 -> goMany gr re1 nxt
       RMany _ _ _ _ re1 -> goMany Greedy re1 nxt
     goMany :: forall a2.
               Greediness -> RE c a2 -> Node c a -> State Unique (Node c a)
@@ -184,14 +185,14 @@ checkSize lim re0 = isJust (evalStateT (go re0) 0)
     go :: RE c a1 -> StateT Int Maybe ()
     go re = case re of
         RToken _ -> inc
-        RFmap _ _ re1 -> inc *> go re1
+        RFmap _ re1 -> inc *> go re1
         RFmap_ _ re1 -> inc *> go re1
         RPure _ -> inc
-        RLiftA2 _ _ re1 re2 -> inc *> go re1 *> go re2
+        RLiftA2 _ re1 re2 -> inc *> go re1 *> go re2
         REmpty -> inc
         RAlt re1 re2 -> inc *> go re1 *> go re2
         RMany _ _ _ _ re1 -> inc *> go re1
-        RFold _ _ _ _ re1 -> inc *> go re1
+        RFold _ _ _ re1 -> inc *> go re1
     inc = do
       ok <- gets (< lim)
       if ok
@@ -204,14 +205,14 @@ checkSize lim re0 = isJust (evalStateT (go re0) 0)
 
 data Cont c b a where
   CTop     :: Cont c a a
-  CFmap    :: !Strictness -> !(b -> a1) -> !(Cont c a1 a) -> Cont c b a
+  CFmap    :: !(b -> Solo a1) -> !(Cont c a1 a) -> Cont c b a
   CFmap_   :: !(Node c a1) -> !(Cont c a1 a) -> Cont c b a
-  CLiftA2A :: !Strictness -> !(b -> a2 -> a3) -> !(Parser c a2) -> !(Cont c a3 a) -> Cont c b a
-  CLiftA2B :: !Strictness -> !(a1 -> b -> a3) -> a1 -> !(Cont c a3 a) -> Cont c b a
+  CLiftA2A :: !(b -> a2 -> Solo a3) -> !(Parser c a2) -> !(Cont c a3 a) -> Cont c b a
+  CLiftA2B :: !(a1 -> b -> Solo a3) -> a1 -> !(Cont c a3 a) -> Cont c b a
   CAlt     :: {-# UNPACK #-} !Unique -> !(Cont c b a) -> Cont c b a
-  CFoldGr  :: {-# UNPACK #-} !Unique -> !Strictness -> !(Parser c b) -> !(a1 -> b -> a1) -> a1 -> !(Cont c a1 a) -> Cont c b a
-  CFoldMn  :: {-# UNPACK #-} !Unique -> !Strictness -> !(Parser c b) -> !(a1 -> b -> a1) -> a1 -> !(Cont c a1 a) -> Cont c b a
-  CMany    :: {-# UNPACK #-} !Unique -> !(Parser c b) -> !(b -> a2) -> !(a1 -> a2) -> !(a1 -> b -> a1) -> !a1 -> !(Cont c a2 a) -> Cont c b a
+  CFoldGr  :: {-# UNPACK #-} !Unique -> !(Parser c b) -> !(a1 -> b -> Solo a1) -> a1 -> !(Cont c a1 a) -> Cont c b a
+  CFoldMn  :: {-# UNPACK #-} !Unique -> !(Parser c b) -> !(a1 -> b -> Solo a1) -> a1 -> !(Cont c a1 a) -> Cont c b a
+  CMany    :: {-# UNPACK #-} !Unique -> !(Parser c b) -> !(b -> Solo a2) -> !(a1 -> Solo a2) -> !(a1 -> b -> Solo a1) -> !a1 -> !(Cont c a2 a) -> Cont c b a
 
 data NeedCList c a where
   NeedCCons :: !(c -> Maybe b) -> !(Cont c b a) -> !(NeedCList c a) -> NeedCList c a
@@ -252,30 +253,30 @@ sInsert u pt = pt { sSet = U.insert u (sSet pt) }
 down :: Parser c b -> Cont c b a -> StepState c a -> StepState c a
 down p !ct !pt = case p of
   PToken t -> pt { sNeed = NeedCCons t ct (sNeed pt) }
-  PFmap st f p1 -> down p1 (CFmap st f ct) pt
+  PFmap f p1 -> down p1 (CFmap f ct) pt
   PFmap_ n -> downNode n ct pt
   PPure b -> up b ct pt
-  PLiftA2 st f p1 p2 -> down p1 (CLiftA2A st f p2 ct) pt
+  PLiftA2 f p1 p2 -> down p1 (CLiftA2A f p2 ct) pt
   PEmpty -> pt
   PAlt u p1 p2 ps ->
     let ct1 = CAlt u ct
     in F.foldl' (\pt' p' -> down p' ct1 pt') (down p2 ct1 (down p1 ct1 pt)) ps
-  PFoldGr u st f z p1 ->
+  PFoldGr u f z p1 ->
     if sMember u pt
     then pt
     else
-      let pt1 = down p1 (CFoldGr u st p1 f z ct) (sInsert (localU u) pt)
+      let pt1 = down p1 (CFoldGr u p1 f z ct) (sInsert (localU u) pt)
       in if sMember u pt1
          then pt1
          else up z ct (sInsert u pt1)
-  PFoldMn u st f z p1 ->
+  PFoldMn u f z p1 ->
     if sMember u pt
     then pt
     else
       let pt1 = if sMember (localU u) pt
                 then pt
                 else up z ct pt
-      in down p1 (CFoldMn u st p1 f z ct) (sInsert u pt1)
+      in down p1 (CFoldMn u p1 f z ct) (sInsert u pt1)
   PMany u f1 f2 f z p1 ->
     if sMember u pt
     then pt
@@ -283,9 +284,7 @@ down p !ct !pt = case p of
       let pt1 = down p1 (CMany u p1 f1 f2 f z ct) (sInsert (localU u) pt)
       in if sMember u pt1
          then pt1
-         else
-           let !x = f2 z
-           in up x ct (sInsert u pt1)
+         else flipSolo (f2 z) $ \x -> up x ct (sInsert u pt1)
 
 downNode :: Node c b -> Cont c b a -> StepState c a -> StepState c a
 downNode n !ct !pt = case n of
@@ -306,55 +305,40 @@ downNode n !ct !pt = case n of
 up :: b -> Cont c b a -> StepState c a -> StepState c a
 up b ct !pt = case ct of
   CTop -> pt { sResult = sResult pt <|> Just b }
-  CFmap st f ct1 -> case st of
-    Strict -> let !x = f b in up x ct1 pt
-    NonStrict -> up (f b) ct1 pt
+  CFmap f ct1 -> flipSolo (f b) $ \x -> up x ct1 pt
   CFmap_ n ct1 -> downNode n ct1 pt
-  CLiftA2A st f p1 ct1 -> down p1 (CLiftA2B st f b ct1) pt
-  CLiftA2B st f a ct1 -> case st of
-    Strict -> let !x = f a b in up x ct1 pt
-    NonStrict -> up (f a b) ct1 pt
+  CLiftA2A f p1 ct1 -> down p1 (CLiftA2B f b ct1) pt
+  CLiftA2B f a ct1 -> flipSolo (f a b) $ \x -> up x ct1 pt
   CAlt u ct1 ->
     if sMember u pt
     then pt
     else up b ct1 (sInsert u pt)
-  CFoldGr u st p1 f z ct1 ->
+  CFoldGr u p1 f z ct1 ->
     if sMember u pt
     then pt
     else
       if sMember (localU u) pt
       then up z ct1 (sInsert u pt)
-      else
-        let go z1 = let pt1 = down p1 (CFoldGr u st p1 f z1 ct1) pt
-                    in up z1 ct1 (sInsert u pt1)
-            {-# INLINE go #-}
-        in case st of
-          Strict -> let !z1 = f z b in go z1
-          NonStrict -> go (f z b)
-  CFoldMn u st p1 f z ct1 ->
+      else flipSolo (f z b) $ \z1 ->
+        let pt1 = down p1 (CFoldGr u p1 f z1 ct1) pt
+        in up z1 ct1 (sInsert u pt1)
+  CFoldMn u p1 f z ct1 ->
     if sMember u pt
     then pt
-    else
-      let go z1 = let pt1 = up z1 ct1 (sInsert (localU u) pt)
-                  in if sMember u pt1
-                     then pt1
-                     else down p1 (CFoldMn u st p1 f z1 ct1) (sInsert u pt1)
-          {-# INLINE go #-}
-      in case st of
-        Strict -> let !z1 = f z b in go z1
-        NonStrict -> go (f z b)
+    else flipSolo (f z b) $ \z1 ->
+      let pt1 = up z1 ct1 (sInsert (localU u) pt)
+      in if sMember u pt1
+         then pt1
+         else down p1 (CFoldMn u p1 f z1 ct1) (sInsert u pt1)
   CMany u p1 f1 f2 f z ct1 ->
     if sMember u pt
     then pt
     else
       if sMember (localU u) pt
-      then
-        let !x = f1 b
-        in up x ct1 (sInsert u pt)
-      else
-        let !z1 = f z b
-            pt1 = down p1 (CMany u p1 f1 f2 f z1 ct1) pt
-            !x = f2 z1
+      then flipSolo (f1 b) $ \x -> up x ct1 (sInsert u pt)
+      else flipSolo (f z b) $ \z1 ->
+           flipSolo (f2 z1) $ \x ->
+        let pt1 = down p1 (CMany u p1 f1 f2 f z1 ct1) pt
         in up x ct1 (sInsert u pt1)
 
 localU :: Unique -> Unique
