@@ -22,7 +22,7 @@ import Data.Maybe (isJust)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IM
 
-import Regex.Internal.Regex (RE(..), Greediness(..))
+import Regex.Internal.Regex (RE(..))
 import Regex.Internal.Parser (Node(..), Parser(..))
 import Regex.Internal.Unique (Unique(..))
 import qualified Regex.Internal.CharSet as CS
@@ -60,8 +60,11 @@ reToDot ma re0 = execM $ do
         withNew (str "RAlt") $ \i -> do
           go re1 >>= writeEdge i
           go re2 >>= writeEdge i
-      RFold gr _ _ re1 ->
-        withNew (str "RFold" <+> dispsGr gr) $ \i ->
+      RFoldGr _ _ re1 ->
+        withNew (str "RFoldGr") $ \i ->
+          go re1 >>= writeEdge i
+      RFoldMn _ _ re1 ->
+        withNew (str "RFoldMn") $ \i ->
           go re1 >>= writeEdge i
       RMany _ _ _ _ re1 ->
         withNew (str "RMany") $ \i ->
@@ -157,11 +160,6 @@ instance Semigroup Str where
 
 instance Monoid Str where
   mempty = Str id
-
-dispsGr :: Greediness -> Str
-dispsGr gr = case gr of
-  Greedy -> str "G"
-  Minimal -> str "M"
 
 labelToken :: String -> (c -> Maybe a) -> Maybe ([c], [c] -> String) -> Str
 labelToken node t = maybe

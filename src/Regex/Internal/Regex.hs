@@ -6,7 +6,6 @@
 --
 module Regex.Internal.Regex
   ( RE(..)
-  , Greediness(..)
   , Many(..)
 
   , token
@@ -101,10 +100,9 @@ data RE c a where
   RLiftA2 :: !(a1 -> a2 -> Solo a) -> !(RE c a1) -> !(RE c a2) -> RE c a
   REmpty  :: RE c a
   RAlt    :: !(RE c a) -> !(RE c a) -> RE c a
-  RFold   :: !Greediness -> !(a -> a1 -> Solo a) -> a -> !(RE c a1) -> RE c a
+  RFoldGr :: !(a -> a1 -> Solo a) -> a -> !(RE c a1) -> RE c a
+  RFoldMn :: !(a -> a1 -> Solo a) -> a -> !(RE c a1) -> RE c a
   RMany   :: !(a1 -> Solo a) -> !(a2 -> Solo a) -> !(a2 -> a1 -> Solo a2) -> !a2 -> !(RE c a1) -> RE c a -- Greedy
-
-data Greediness = Greedy | Minimal
 
 instance Functor (RE c) where
   fmap f = RFmap (\x -> mkSolo (f x))
@@ -163,18 +161,18 @@ manyr =
 --
 -- Also see the section "Looping parsers".
 foldlMany :: (b -> a -> b) -> b -> RE c a -> RE c b
-foldlMany f = RFold Greedy (\z x -> mkSolo (f z x))
+foldlMany f = RFoldGr (\z x -> mkSolo (f z x))
 
 foldlMany' :: (b -> a -> b) -> b -> RE c a -> RE c b
-foldlMany' f !z = RFold Greedy (\z' x -> mkSolo' (f z' x)) z
+foldlMany' f !z = RFoldGr (\z' x -> mkSolo' (f z' x)) z
 
 -- | Parse many occurences of the given @RE@. Minimal, i.e. biased towards
 -- matching less.
 foldlManyMin :: (b -> a -> b) -> b -> RE c a -> RE c b
-foldlManyMin f = RFold Minimal (\z x -> mkSolo (f z x))
+foldlManyMin f = RFoldMn (\z x -> mkSolo (f z x))
 
 foldlManyMin' :: (b -> a -> b) -> b -> RE c a -> RE c b
-foldlManyMin' f !z = RFold Minimal (\z' x -> mkSolo' (f z' x)) z
+foldlManyMin' f !z = RFoldMn (\z' x -> mkSolo' (f z' x)) z
 
 -- | Parse a @c@ if it satisfies the given predicate.
 satisfy :: (c -> Bool) -> RE c c

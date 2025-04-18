@@ -50,7 +50,7 @@ import Data.CharSet (CharSet)
 import qualified Data.CharSet as CS
 import Regex.Internal.Parser (Parser)
 import qualified Regex.Internal.Parser as P
-import Regex.Internal.Regex (RE(..), Greediness(..))
+import Regex.Internal.Regex (RE(..))
 import qualified Regex.Internal.Regex as R
 import qualified Regex.Internal.Num as RNum
 import qualified Regex.Internal.Generated.CaseFold as CF
@@ -239,10 +239,9 @@ toMatch_ re = case re of
   RLiftA2 _ re1 re2 -> R.liftA2' (<>) (toMatch_ re1) (toMatch_ re2)
   REmpty -> Ap.empty
   RAlt re1 re2 -> toMatch_ re1 <|> toMatch_ re2
+  RFoldGr _ _ re1 -> R.foldlMany' (<>) mempty (toMatch_ re1)
+  RFoldMn _ _ re1 -> R.foldlManyMin' (<>) mempty (toMatch_ re1)
   RMany _ _ _ _ re1 -> R.foldlMany' (<>) mempty (toMatch_ re1)
-  RFold gr _ _ re1 -> case gr of
-    Greedy -> R.foldlMany' (<>) mempty (toMatch_ re1)
-    Minimal -> R.foldlManyMin' (<>) mempty (toMatch_ re1)
 
 data WithMatch c a = WM !(DList c) a
 
@@ -270,6 +269,8 @@ withMatch = R.fmap' (\(WM cs x) -> (dToL cs, x)) . go
       RLiftA2 f re1 re2 -> R.liftA2' (liftA2WM f) (go re1) (go re2)
       REmpty -> Ap.empty
       RAlt re1 re2 -> go re1 <|> go re2
+      RFoldGr f z re1 -> R.foldlMany' (liftA2WM f) (pureWM z) (go re1)
+      RFoldMn f z re1 -> R.foldlManyMin' (liftA2WM f) (pureWM z) (go re1)
       RMany f1 f2 f z re1 ->
         RMany
           (\x -> mkSolo' (fmapWM f1 x))
@@ -277,9 +278,6 @@ withMatch = R.fmap' (\(WM cs x) -> (dToL cs, x)) . go
           (\x y -> mkSolo' (liftA2WM f x y))
           (pureWM z)
           (go re1)
-      RFold gr f z re1 -> case gr of
-        Greedy -> R.foldlMany' (liftA2WM f) (pureWM z) (go re1)
-        Minimal -> R.foldlManyMin' (liftA2WM f) (pureWM z) (go re1)
 
 ----------
 -- Parse
