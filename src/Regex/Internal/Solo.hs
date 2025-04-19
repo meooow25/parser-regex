@@ -5,6 +5,8 @@
 {-# LANGUAGE UnliftedNewtypes #-}
 #endif
 
+-- | This is an internal module. You probably don't need to import this.
+--
 module Regex.Internal.Solo
   ( Solo
   , mkSolo

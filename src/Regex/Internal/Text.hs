@@ -404,8 +404,7 @@ toMatch = go
       RFmap _ re1 -> go re1
       RFmap_ _ re1 -> go re1
       RPure _ -> pure T.empty
-      RLiftA2 _ re1 re2 ->
-        R.liftA2' unsafeAdjacentAppend (go re1) (go re2)
+      RLiftA2 _ re1 re2 -> R.liftA2' unsafeAdjacentAppend (go re1) (go re2)
       REmpty -> Ap.empty
       RAlt re1 re2 -> go re1 <|> go re2
       RFoldGr _ _ re1 -> R.foldlMany' unsafeAdjacentAppend T.empty (go re1)
