@@ -85,7 +85,7 @@ import Regex.Internal.Regex (RE(..))
 import qualified Regex.Internal.Regex as R
 import qualified Regex.Internal.Num as RNum
 import qualified Regex.Internal.Generated.CaseFold as CF
-import Regex.Internal.Solo (Solo, mkSolo', matchSolo)
+import Regex.Internal.Solo (Solo, mkSolo, matchSolo)
 
 ----------------------
 -- Token and Text REs
@@ -446,9 +446,9 @@ withMatch = R.fmap' (\(WM t x) -> (t,x)) . go
       RFoldMn f z re1 -> R.foldlManyMin' (liftA2WM f) (pureWM z) (go re1)
       RMany f1 f2 f z re1 ->
         RMany
-          (\x -> mkSolo' (fmapWM f1 x))
-          (\x -> mkSolo' (fmapWM f2 x))
-          (\x y -> mkSolo' (liftA2WM f x y))
+          (\x -> mkSolo $! fmapWM f1 x)
+          (\x -> mkSolo $! fmapWM f2 x)
+          (\x y -> mkSolo $! liftA2WM f x y)
           (pureWM z)
           (go re1)
 #else
