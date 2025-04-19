@@ -51,7 +51,7 @@ import Data.Semigroup (Semigroup(..))
 import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 
-import Regex.Internal.Solo (Solo, mkSolo, mkSolo')
+import Regex.Internal.Solo (Solo, mkSolo)
 
 ---------------------------------
 -- RE and constructor functions
@@ -106,19 +106,27 @@ data RE c a where
 
 instance Functor (RE c) where
   fmap f = RFmap (\x -> mkSolo (f x))
+  {-# INLINE fmap #-}
+
   (<$) = RFmap_
 
 fmap' :: (a -> b) -> RE c a -> RE c b
-fmap' f = RFmap (\x -> mkSolo' (f x))
+fmap' f = RFmap (\x -> mkSolo $! f x)
+{-# INLINE fmap' #-}
 
 instance Applicative (RE c) where
   pure = RPure
+
   liftA2 f = RLiftA2 (\x y -> mkSolo (f x y))
+  {-# INLINE liftA2 #-}
+
   re1 *> re2 = RLiftA2 (\_ y -> mkSolo y) (void re1) re2
+
   re1 <* re2 = RLiftA2 (\x _ -> mkSolo x) re1 (void re2)
 
 liftA2' :: (a1 -> a2 -> b) -> RE c a1 -> RE c a2 -> RE c b
-liftA2' f = RLiftA2 (\x y -> mkSolo' (f x y))
+liftA2' f = RLiftA2 (\x y -> mkSolo $! f x y)
+{-# INLINE liftA2' #-}
 
 instance Alternative (RE c) where
   empty = REmpty
@@ -152,9 +160,9 @@ token = RToken
 manyr :: RE c a -> RE c (Many a)
 manyr =
   RMany
-    (\xs -> mkSolo' (Repeat xs))
-    (\xs -> mkSolo' (Finite (reverse xs)))
-    (\xs x -> mkSolo' (x:xs))
+    (\xs -> mkSolo (Repeat xs))
+    (\xs -> mkSolo (Finite (reverse xs)))
+    (\xs x -> mkSolo (x:xs))
     []
 
 -- | Parse many occurences of the given @RE@. Biased towards matching more.
@@ -162,17 +170,21 @@ manyr =
 -- Also see the section "Looping parsers".
 foldlMany :: (b -> a -> b) -> b -> RE c a -> RE c b
 foldlMany f = RFoldGr (\z x -> mkSolo (f z x))
+{-# INLINE foldlMany #-}
 
 foldlMany' :: (b -> a -> b) -> b -> RE c a -> RE c b
-foldlMany' f !z = RFoldGr (\z' x -> mkSolo' (f z' x)) z
+foldlMany' f !z = RFoldGr (\z' x -> mkSolo $! f z' x) z
+{-# INLINE foldlMany' #-}
 
 -- | Parse many occurences of the given @RE@. Minimal, i.e. biased towards
 -- matching less.
 foldlManyMin :: (b -> a -> b) -> b -> RE c a -> RE c b
 foldlManyMin f = RFoldMn (\z x -> mkSolo (f z x))
+{-# INLINE foldlManyMin #-}
 
 foldlManyMin' :: (b -> a -> b) -> b -> RE c a -> RE c b
-foldlManyMin' f !z = RFoldMn (\z' x -> mkSolo' (f z' x)) z
+foldlManyMin' f !z = RFoldMn (\z' x -> mkSolo $! f z' x) z
+{-# INLINE foldlManyMin' #-}
 
 -- | Parse a @c@ if it satisfies the given predicate.
 satisfy :: (c -> Bool) -> RE c c
