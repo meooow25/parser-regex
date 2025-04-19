@@ -1,6 +1,6 @@
 cabal-version:      2.4
 name:               parser-regex
-version:            0.2.0.2
+version:            0.3.0.0
 synopsis:           Regex based parsers
 homepage:           https://github.com/meooow25/parser-regex
 bug-reports:        https://github.com/meooow25/parser-regex/issues

@@ -1,5 +1,3 @@
-{-# OPTIONS_HADDOCK not-home #-}
-
 -- | This is an internal module. You probably don't need to import this.
 --
 -- = WARNING
