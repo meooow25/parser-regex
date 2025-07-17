@@ -81,8 +81,7 @@ library
 
     if impl(ghc)
         build-depends:
-            ghc-bignum >= 1.1 && < 1.4
-          , primitive >= 0.7.3 && < 0.10
+            primitive >= 0.7.3 && < 0.10
 
     if impl(mhs)
         build-depends:
