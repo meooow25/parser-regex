@@ -224,9 +224,9 @@ mkWordRangeBase base quotRemPowBase powBase baseLen d low high
 --
 -- Step 1: Accumulate the hex digits, packed into Words
 -- Step 2:
---   * GHC: Initialize a ByteArray and fill it with the Words. This takes
---     O(n) time. Because we create a Nat directly, this makes us depend on
---     ghc-bignum and GHC>=9.0.
+--   * GHC: Create the Natural directly. We support only the new Natural
+--     representation in GHC>=9.0, which is backed by a Word or a ByteArray.
+--     If it's a ByteArray we fill it in O(n) time.
 --   * Not GHC: Do it like we do for decimal, without being aware of the
 --     representation of Naturals, but replace the base multiplications with
 --     shifts. If it is a binary representation, this takes O(n log n) time
