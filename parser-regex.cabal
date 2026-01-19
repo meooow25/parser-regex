@@ -29,8 +29,9 @@ tested-with:
   , GHC == 9.4.8
   , GHC == 9.6.6
   , GHC == 9.8.4
-  , GHC == 9.10.1
-  , GHC == 9.12.1
+  , GHC == 9.10.3
+  , GHC == 9.12.2
+  , GHC == 9.14.1
 
 source-repository head
     type:     git
@@ -81,7 +82,7 @@ library
 
     if impl(ghc)
         build-depends:
-            ghc-bignum >= 1.1 && < 1.4
+            ghc-bignum >= 1.1 && < 1.5
           , primitive >= 0.7.3 && < 0.10
 
     if impl(mhs)
