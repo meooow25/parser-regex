@@ -8,9 +8,9 @@
 #
 # For more information, see https://github.com/haskell-CI/haskell-ci
 #
-# version: 0.19.20260104
+# version: 0.19.20261010
 #
-# REGENDATA ("0.19.20260104",["github","parser-regex.cabal","--branches","master","--installed","-text","--no-error-unused-packages"])
+# REGENDATA ("0.19.20261010",["github","parser-regex.cabal","--branches","master","--installed","-text","--no-error-unused-packages"])
 #
 name: Haskell-CI
 on:
@@ -23,6 +23,8 @@ on:
   merge_group:
     branches:
       - master
+  workflow_dispatch:
+    {}
 jobs:
   linux:
     name: Haskell-CI - Linux - ${{ matrix.compiler }}
@@ -30,7 +32,7 @@ jobs:
     timeout-minutes:
       60
     container:
-      image: buildpack-deps:jammy
+      image: buildpack-deps:noble
     continue-on-error: ${{ matrix.allow-failure }}
     strategy:
       matrix:
@@ -40,9 +42,9 @@ jobs:
             compilerVersion: 9.14.1
             setup-method: ghcup
             allow-failure: false
-          - compiler: ghc-9.12.2
+          - compiler: ghc-9.12.4
             compilerKind: ghc
-            compilerVersion: 9.12.2
+            compilerVersion: 9.12.4
             setup-method: ghcup
             allow-failure: false
           - compiler: ghc-9.10.3
@@ -55,9 +57,9 @@ jobs:
             compilerVersion: 9.8.4
             setup-method: ghcup
             allow-failure: false
-          - compiler: ghc-9.6.6
+          - compiler: ghc-9.6.7
             compilerKind: ghc
-            compilerVersion: 9.6.6
+            compilerVersion: 9.6.7
             setup-method: ghcup
             allow-failure: false
           - compiler: ghc-9.4.8
@@ -80,7 +82,7 @@ jobs:
       - name: apt-get install
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends gnupg ca-certificates dirmngr curl git software-properties-common libtinfo5
+          apt-get install -y --no-install-recommends gnupg ca-certificates dirmngr curl git software-properties-common
       - name: Install GHCup
         run: |
           mkdir -p "$HOME/.ghcup/bin"
@@ -165,7 +167,7 @@ jobs:
           chmod a+x $HOME/.cabal/bin/cabal-plan
           cabal-plan --version
       - name: checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           path: source
       - name: initial cabal.project for sdist
@@ -203,11 +205,11 @@ jobs:
           $CABAL v2-build $ARG_COMPILER $ARG_TESTS $ARG_BENCH --dry-run all
           cabal-plan
       - name: restore cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
-          key: ${{ runner.os }}-${{ matrix.compiler }}-${{ github.sha }}
+          key: noble-${{ matrix.compiler }}-${{ github.sha }}
           path: ~/.cabal/store
-          restore-keys: ${{ runner.os }}-${{ matrix.compiler }}-
+          restore-keys: noble-${{ matrix.compiler }}-
       - name: install dependencies
         run: |
           $CABAL v2-build $ARG_COMPILER --disable-tests --disable-benchmarks --dependencies-only -j2 all
@@ -234,7 +236,7 @@ jobs:
           $CABAL v2-build $ARG_COMPILER --disable-tests --disable-benchmarks all
       - name: save cache
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
-          key: ${{ runner.os }}-${{ matrix.compiler }}-${{ github.sha }}
+          key: noble-${{ matrix.compiler }}-${{ github.sha }}
           path: ~/.cabal/store
