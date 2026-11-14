@@ -2,8 +2,21 @@
 -- It is recommended to import this module qualified to avoid name conflicts
 -- with functions from the Prelude.
 --
--- Enabling [@OverloadedStrings@](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/overloaded_strings.html)
--- will allow declaring @CharSet@s using string literal syntax.
+-- On GHC 10.0 and above, the
+-- [@QualifiedStrings@](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/qualified_strings.html)
+-- extension can be enabled to create @CharSet@s using string literal syntax.
+--
+-- @
+-- {-# LANGUAGE QualifiedStrings #-}
+--
+-- import qualified Data.CharSet as CS
+--
+-- vowels :: CS.CharSet
+-- vowels = CS."aeiou"
+-- @
+--
+-- The [@OverloadedStrings@](https://ghc.gitlab.haskell.org/ghc/doc/users_guide/exts/overloaded_strings.html)
+-- extension can also be used.
 --
 -- @
 -- {-# LANGUAGE OverloadedStrings #-}
@@ -38,6 +51,7 @@ module Data.CharSet
   , CS.notMember
   , CS.elems
   , CS.ranges
+  , CS.fromString
 
     -- * Available @CharSet@s
   , CS.empty
@@ -58,10 +72,10 @@ import qualified Regex.Internal.CharSets as CSets
 
 -- $ops
 --
--- Variables used:
+-- The documentation below uses the following variables:
 --
--- * \(n\): the number of @Char@ ranges
--- * \(s\): the number of @Char@s
--- * \(C\): the maximum bits in a @Char@, i.e. 21
--- * \(n\), \(m\): the number of @Char@ ranges in the first and second sets
+-- * \(n\) for the number of @Char@ ranges
+-- * \(s\) for the number of @Char@s
+-- * \(C\) for the maximum bits in a @Char@, i.e. 21
+-- * \(n\), \(m\) for the number of @Char@ ranges in the first and second sets
 --   respectively, for functions taking two sets
