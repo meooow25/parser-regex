@@ -33,13 +33,14 @@ module Regex.Internal.CharSet
   , notMember
   , elems
   , ranges
+  , fromString
   , valid
   ) where
 
 import Prelude hiding (not, map)
 import qualified Prelude
 import Data.Char (ord)
-import Data.String (IsString(..))
+import qualified Data.String
 import qualified Data.Foldable as F
 import qualified Data.IntMap.Strict as IM
 import Data.Semigroup (Semigroup(..), stimesIdempotentMonoid)
@@ -52,9 +53,9 @@ import GHC.Exts (Int(..), Char(..), chr#)
 
 -- | A set of @Char@s.
 --
--- The members are stored as contiguous ranges of @Char@s. This is efficient
--- when the members form contiguous ranges since many @Char@s can be represented
--- with just one range.
+-- /Implementation note/: The members are stored as contiguous ranges of @Char@s,
+-- allowing many @Char@s to be compactly represented with just one range. This
+-- representation is chosen as contiguous ranges occur commonly in practice.
 newtype CharSet = CharSet { unCharSet :: IM.IntMap Char } deriving Eq
 
 instance Show CharSet where
@@ -62,7 +63,7 @@ instance Show CharSet where
     showString "fromRanges " . shows (ranges cs)
 
 -- | @fromString@ = 'fromList'
-instance IsString CharSet where
+instance Data.String.IsString CharSet where
   fromString = fromList
 
 -- | @(<>)@ = 'union'
@@ -232,6 +233,11 @@ unsafeChr (I# i#) = C# (chr# i#)
 #else
 unsafeChr = toEnum
 #endif
+
+-- | Alias of 'fromList', to work with the @QualifiedStrings@ extension.
+fromString :: String -> CharSet
+fromString = fromList
+{-# INLINE fromString #-}
 
 ------------
 -- Testing
