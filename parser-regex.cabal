@@ -27,10 +27,10 @@ tested-with:
     GHC == 9.0.2
   , GHC == 9.2.8
   , GHC == 9.4.8
-  , GHC == 9.6.6
+  , GHC == 9.6.7
   , GHC == 9.8.4
   , GHC == 9.10.3
-  , GHC == 9.12.2
+  , GHC == 9.12.4
   , GHC == 9.14.1
 
 source-repository head
@@ -96,7 +96,7 @@ test-suite test
     build-depends:
         base
       , parser-regex
-      , QuickCheck >= 2.14.3 && < 2.16
+      , QuickCheck >= 2.14.3 && < 2.20
       , quickcheck-classes-base >= 0.6.2 && < 0.7
       , tasty >= 1.5 && < 1.6
       , tasty-hunit >= 0.10.1 && < 0.11
